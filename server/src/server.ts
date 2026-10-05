@@ -12,7 +12,11 @@ async function startServer() {
     const app = createApp();
 
     app.listen(env.PORT, () => {
-      console.log(`✅ DokanBD API running on port ${env.PORT}`);
+      const baseUrl = `http://localhost:${env.PORT}`;
+
+      console.log(`✅ DokanBD API running at ${baseUrl}`);
+      console.log(`📘 Swagger UI: ${baseUrl}/api-docs/`);
+      console.log(`📄 OpenAPI JSON: ${baseUrl}/api-docs.json`);
     });
   } catch (error) {
     console.error("❌ Unable to start DokanBD API.");

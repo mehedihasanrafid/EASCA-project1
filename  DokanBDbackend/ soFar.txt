@@ -1,0 +1,95 @@
+DokanBD Backend — Technical Progress Report
+
+Technology Stack
+
+- Runtime: Node.js.
+- Web framework: Express 5.
+- Language: TypeScript with strict type checking and ESM modules.
+- ORM and database: TypeORM with MySQL.
+- Validation: Zod for environment variables, request bodies, parameters and query strings.
+- Authentication: JSON Web Token, bcryptjs and opaque refresh tokens.
+- Email service: Nodemailer with planned Gmail SMTP delivery.
+- File upload: Multer with file-type, file-count and file-size validation.
+- API documentation: OpenAPI 3.0 and Swagger UI.
+- Logging: Pino and pino-http structured logging.
+- Testing: Vitest and Supertest.
+
+Application Architecture
+
+- Implemented a versioned REST API under `/api/v1`.
+- Used modular route, controller, service, entity and validation-schema layers.
+- Kept HTTP handling inside controllers and business rules inside services.
+- Used TypeORM repositories and transactions for database operations.
+- Added centralized application-error, not-found and error-handling middleware.
+- Added validated environment-based configuration through `.env` and Zod.
+- Added graceful startup and shutdown for the HTTP server and database connection.
+
+Database Implementation
+
+- Configured a reusable TypeORM DataSource with `synchronize: false`.
+- Reused the existing `dokanbd` MySQL database and application account.
+- Applied the initial-schema and authentication-security migrations.
+- Verified 22 application tables and two completed migration records.
+- Created entity relationships using primary keys, foreign keys and TypeORM relations.
+- Added repeatable seed data for CUSTOMER, ADMIN and OWNER roles.
+- Added starter categories, product types and brands through the seed process.
+- Added soft-delete support for categories, products and applicable user data.
+- Added created, updated and deleted timestamp columns where required.
+- Used database transactions for default-address handling, checkout and stock updates.
+
+Authentication and Security
+
+- Implemented customer registration with unique phone and optional unique email validation.
+- Added bcrypt password hashing and secure password comparison.
+- Implemented login using either email address or Bangladesh mobile number.
+- Added short-lived JWT access-token authentication.
+- Added hashed refresh-token sessions stored in MySQL.
+- Implemented refresh-token rotation, single-session logout and logout-all functionality.
+- Stored refresh tokens in HTTP-only, SameSite cookies.
+- Added email-verification token generation, hashing, expiry and one-time usage.
+- Added resend-verification, forgot-password and reset-password endpoints.
+- Added role-based access control for CUSTOMER, ADMIN and OWNER users.
+- Added authentication and email-action rate limiting with `express-rate-limit`.
+- Added Helmet security headers, CORS policy and request-size limits.
+- Added consistent validation and error responses without exposing sensitive data.
+
+Business Modules
+
+- Users: Current profile, profile update, profile-image upload and administrator user management.
+- Addresses: Customer-owned CRUD operations and one-default-address enforcement.
+- Categories: Public category tree, administrator CRUD, soft delete and restore.
+- Products: Public listing, product details and administrator product management.
+- Product variants: SKU, price, size, colour, stock quantity and active/default status.
+- Product media: Multiple image upload, metadata update, primary image and deletion.
+- Catalogue queries: Search, category filter, price range, sorting and pagination.
+- Cart: Active cart creation, add/update/remove items, clear cart and server-side totals.
+- Inventory: Stock validation and inventory-movement records.
+- Checkout: Transaction-safe order creation from the active cart.
+- Orders: Address/product snapshots, item totals, delivery fees and grand totals.
+- Customer orders: Order history, details and allowed cancellation workflow.
+- Administrator orders: Filtering, details and controlled status transitions.
+- Stock handling: Stock reduction during checkout and restoration during cancellation.
+
+Documentation and Verification
+
+- Documented 41 API paths and 53 operations in Swagger/OpenAPI.
+- Added bearer-token authorization support inside Swagger UI.
+- Documented JSON request bodies, query parameters, path parameters and multipart uploads.
+- Added structured HTTP request logs, request IDs and application logs.
+- Completed TypeScript type checking successfully.
+- Completed the production TypeScript build successfully.
+- Passed four automated test files containing 14 tests.
+- Verified the MySQL connection, migrations and repeatable seed execution.
+- Verified health and OpenAPI endpoints with HTTP 200 responses.
+- Verified registration, email-token verification, login, authenticated `/me`, refresh and logout flows.
+
+Current Pending Work
+
+- Create a Google App Password and activate Gmail SMTP configuration.
+- Test real email verification and password-reset delivery.
+- Complete live integration testing for addresses, products, variants and image uploads.
+- Complete the full customer cart, checkout and order-status test workflow.
+- Add database-backed Supertest integration tests using an isolated test database.
+- Add inventory-adjustment, low-stock and administrator-dashboard endpoints.
+- Complete payment, return and refund workflows if required.
+- Add audit logging, Redis caching, deployment configuration, monitoring and backups.

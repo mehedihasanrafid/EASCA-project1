@@ -48,6 +48,13 @@ export class User {
   email!: string | null;
 
   @Column({
+    name: "email_verified_at",
+    type: "datetime",
+    nullable: true,
+  })
+  emailVerifiedAt!: Date | null;
+
+  @Column({
     type: "varchar",
     length: 20,
     unique: true,

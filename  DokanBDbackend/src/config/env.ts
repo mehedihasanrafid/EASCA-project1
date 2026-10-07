@@ -27,6 +27,7 @@ const environmentSchema = z.object({
   REDIS_URL: z.string().url().optional(),
   UPLOAD_DIR: z.string().min(1).default("uploads"),
   MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(2097152),
+  MAX_VIDEO_UPLOAD_BYTES: z.coerce.number().int().positive().default(20971520),
   DELIVERY_INSIDE_DHAKA: z.coerce.number().nonnegative().default(60),
   DELIVERY_OUTSIDE_DHAKA: z.coerce.number().nonnegative().default(120),
   SEED_ADMIN_NAME: z.string().min(2).optional(),

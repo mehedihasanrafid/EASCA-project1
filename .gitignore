@@ -2,6 +2,9 @@ node_modules/
 dist/
 build/
 coverage/
+*.tsbuildinfo
+web/vite.config.js
+web/vite.config.d.ts
 
 .env
 .env.*
@@ -17,4 +20,3 @@ npm-debug.log*
 uploads/
 backups/
 *.sql
-

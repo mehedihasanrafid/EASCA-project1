@@ -17,10 +17,11 @@ import {
 } from "./product.controller.js";
 import {
   deleteProductImageHandler,
+  listProductMediaHandler,
   updateProductImageHandler,
   uploadProductImages,
 } from "./product-media.controller.js";
-import { productImageUpload } from "./product-media-upload.middleware.js";
+import { productMediaUpload } from "./product-media-upload.middleware.js";
 
 export const productRouter = Router();
 export const adminProductRouter = Router();
@@ -46,9 +47,13 @@ adminProductRouter.delete(
 );
 adminProductRouter.post(
   "/:productId/media",
-  productImageUpload.array("images", 4),
+  productMediaUpload.fields([
+    { name: "media", maxCount: 4 },
+    { name: "images", maxCount: 4 },
+  ]),
   uploadProductImages,
 );
+adminProductRouter.get("/:productId/media", listProductMediaHandler);
 adminProductRouter.patch(
   "/:productId/media/:mediaId",
   updateProductImageHandler,

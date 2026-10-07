@@ -13,23 +13,25 @@ const allowedMimeTypes = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
+  "video/mp4",
+  "video/webm",
 ]);
 
-export const productImageUpload = multer({
+export const productMediaUpload = multer({
   storage: multer.diskStorage({
     destination: productDirectory,
     filename(_request, file, callback) {
       callback(null, `${randomUUID()}${extname(file.originalname).toLowerCase()}`);
     },
   }),
-  limits: { fileSize: env.MAX_UPLOAD_BYTES, files: 4 },
+  limits: { fileSize: env.MAX_VIDEO_UPLOAD_BYTES, files: 4 },
   fileFilter(_request, file, callback) {
     if (!allowedMimeTypes.has(file.mimetype)) {
       callback(
         new AppError(
           400,
-          "INVALID_IMAGE_TYPE",
-          "Only JPEG, PNG and WebP images are allowed.",
+          "INVALID_MEDIA_TYPE",
+          "Only JPEG, PNG, WebP, MP4 and WebM product media are allowed.",
         ),
       );
       return;

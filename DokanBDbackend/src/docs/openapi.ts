@@ -11,13 +11,14 @@ interface EndpointDefinition {
   admin?: boolean;
   body?: string;
   bodyRequired?: boolean;
-  multipart?: "image" | "images";
+  multipart?: "image" | "media";
   parameters?: OpenApiObject[];
   success?: string;
   successDescription?: string;
   notFound?: boolean;
   conflict?: boolean;
   rateLimited?: boolean;
+  responseSchema?: string;
 }
 
 const schemaRef = (name: string) => ({
@@ -466,19 +467,33 @@ const endpointDefinitions: EndpointDefinition[] = [
     method: "post",
     path: "/admin/products/{productId}/media",
     tag: "Admin products",
-    summary: "Upload up to four product images",
+    summary: "Upload up to four product images or short videos",
+    description:
+      "Accepts JPEG, PNG and WebP images up to the configured image limit, plus MP4 and WebM videos up to the configured video limit. The product may have four media items in total.",
     auth: true,
     admin: true,
     parameters: [idParameter("productId", "Product ID")],
-    multipart: "images",
+    multipart: "media",
     success: "201",
+    responseSchema: "ProductMediaListResponse",
+    notFound: true,
+  },
+  {
+    method: "get",
+    path: "/admin/products/{productId}/media",
+    tag: "Admin products",
+    summary: "List all media for a product",
+    auth: true,
+    admin: true,
+    parameters: [idParameter("productId", "Product ID")],
+    responseSchema: "ProductMediaListResponse",
     notFound: true,
   },
   {
     method: "patch",
     path: "/admin/products/{productId}/media/{mediaId}",
     tag: "Admin products",
-    summary: "Update product image metadata",
+    summary: "Update product media metadata",
     auth: true,
     admin: true,
     parameters: [
@@ -486,13 +501,14 @@ const endpointDefinitions: EndpointDefinition[] = [
       idParameter("mediaId", "Media ID"),
     ],
     body: "UpdateProductMediaRequest",
+    responseSchema: "ProductMediaResponse",
     notFound: true,
   },
   {
     method: "delete",
     path: "/admin/products/{productId}/media/{mediaId}",
     tag: "Admin products",
-    summary: "Delete a product image",
+    summary: "Delete a product media item",
     auth: true,
     admin: true,
     parameters: [
@@ -641,7 +657,7 @@ const endpointDefinitions: EndpointDefinition[] = [
 
 function buildRequestBody(endpoint: EndpointDefinition) {
   if (endpoint.multipart) {
-    const multiple = endpoint.multipart === "images";
+    const multiple = endpoint.multipart === "media";
     return {
       required: true,
       content: {
@@ -653,6 +669,9 @@ function buildRequestBody(endpoint: EndpointDefinition) {
               [endpoint.multipart]: multiple
                 ? {
                     type: "array",
+                    description:
+                      "JPEG, PNG or WebP images (maximum 2 MB each), or MP4 and WebM videos (maximum 20 MB each).",
+                    minItems: 1,
                     maxItems: 4,
                     items: { type: "string", format: "binary" },
                   }
@@ -693,7 +712,9 @@ function buildResponses(endpoint: EndpointDefinition) {
         : {
             description: endpoint.successDescription ?? "Request completed successfully",
             content: {
-              "application/json": { schema: schemaRef("SuccessResponse") },
+              "application/json": {
+                schema: schemaRef(endpoint.responseSchema ?? "SuccessResponse"),
+              },
             },
           },
     "400": responseRef("ValidationError"),
@@ -972,6 +993,63 @@ export const openApiDocument = {
           altText: { type: "string", nullable: true, maxLength: 255 },
           sortOrder: { type: "integer", minimum: 0 },
           isPrimary: { type: "boolean" },
+        },
+      },
+      ProductMedia: {
+        type: "object",
+        required: [
+          "id",
+          "productId",
+          "type",
+          "url",
+          "sortOrder",
+          "isPrimary",
+          "createdAt",
+        ],
+        properties: {
+          id: { type: "string", example: "1" },
+          productId: { type: "string", example: "12" },
+          variantId: { type: "string", nullable: true },
+          type: { type: "string", enum: ["IMAGE", "VIDEO"] },
+          url: { type: "string", example: "/uploads/products/example.webp" },
+          thumbnailUrl: { type: "string", nullable: true },
+          altText: { type: "string", nullable: true, maxLength: 255 },
+          sortOrder: { type: "integer", minimum: 0 },
+          isPrimary: {
+            type: "boolean",
+            description: "Only image media may be the primary catalog image.",
+          },
+          createdAt: { type: "string", format: "date-time" },
+        },
+      },
+      ProductMediaResponse: {
+        type: "object",
+        required: ["success", "data"],
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            required: ["media"],
+            properties: { media: schemaRef("ProductMedia") },
+          },
+        },
+      },
+      ProductMediaListResponse: {
+        type: "object",
+        required: ["success", "data"],
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            required: ["media"],
+            properties: {
+              media: {
+                type: "array",
+                maxItems: 4,
+                items: schemaRef("ProductMedia"),
+              },
+            },
+          },
         },
       },
       AddCartItemRequest: {

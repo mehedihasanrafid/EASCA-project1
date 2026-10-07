@@ -105,7 +105,10 @@ function toPublicProduct(
   includeDetail: boolean,
 ) {
   const stockQuantity = totalStock(variants);
-  const primaryMedia = media.find((item) => item.isPrimary) ?? media[0] ?? null;
+  const primaryMedia =
+    media.find((item) => item.mediaType === "IMAGE" && item.isPrimary) ??
+    media.find((item) => item.mediaType === "IMAGE") ??
+    null;
 
   return {
     id: product.id,
@@ -137,10 +140,10 @@ function toPublicProduct(
     stockQuantity,
     inStock: stockQuantity > 0,
     primaryImage: primaryMedia ? toPublicMedia(primaryMedia) : null,
+    media: media.map(toPublicMedia),
     ...(includeDetail
       ? {
           variants: variants.map(toPublicVariant),
-          media: media.map(toPublicMedia),
         }
       : {}),
     createdAt: product.createdAt,

@@ -1,15 +1,14 @@
-export const App = () => {
-  return (
-    <main className="app-shell">
-      <section className="welcome-card">
-        <p className="eyebrow">DokanBD</p>
-        <h1>Project foundation is ready.</h1>
-        <p>
-          The next milestone is connecting the API to MySQL and building the
-          first catalog feature.
-        </p>
-      </section>
-    </main>
-  );
-};
+import React from 'react';
+import { AuthProvider } from './features/auth/AuthContext';
+import { AppRouter } from './routes/AppRouter';
+import './styles/global.css';
 
+function App() {
+  return (
+    <AuthProvider>
+      <AppRouter />
+    </AuthProvider>
+  );
+}
+
+export default App;

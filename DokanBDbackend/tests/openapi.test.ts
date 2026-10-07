@@ -15,7 +15,7 @@ describe("OpenAPI documentation", () => {
     );
 
     expect(Object.keys(paths)).toHaveLength(41);
-    expect(operationCount).toBe(53);
+    expect(operationCount).toBe(54);
   });
 
   it("marks protected and administrator operations with bearer security", () => {
@@ -31,5 +31,12 @@ describe("OpenAPI documentation", () => {
       paths["/admin/products/{productId}/media"]?.post?.requestBody,
     ).toBeDefined();
     expect(paths["/users/me/profile-image"]?.post?.requestBody).toBeDefined();
+  });
+
+  it("documents product media listing and response schemas", () => {
+    expect(paths["/admin/products/{productId}/media"]?.get).toBeDefined();
+    const components = openApiDocument.components.schemas as Record<string, unknown>;
+    expect(components.ProductMedia).toBeDefined();
+    expect(components.ProductMediaListResponse).toBeDefined();
   });
 });

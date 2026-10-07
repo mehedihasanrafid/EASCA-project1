@@ -6,9 +6,10 @@ import {
   updateProductMediaSchema,
 } from "./product-media.schema.js";
 import {
-  addProductImages,
+  addProductMedia,
   cleanupUploadedProductImages,
   deleteProductImage,
+  listProductMedia,
   updateProductImage,
 } from "./product-media.service.js";
 
@@ -20,10 +21,12 @@ function requiredParam(value: string | string[] | undefined, name: string) {
 }
 
 export const uploadProductImages: RequestHandler = async (request, response) => {
-  const files = Array.isArray(request.files) ? request.files : [];
+  const files = Array.isArray(request.files)
+    ? request.files
+    : Object.values(request.files ?? {}).flat();
 
   try {
-    const media = await addProductImages(
+    const media = await addProductMedia(
       requiredParam(request.params.productId, "productId"),
       files,
       createProductMediaSchema.parse(request.body),
@@ -33,6 +36,13 @@ export const uploadProductImages: RequestHandler = async (request, response) => 
     await cleanupUploadedProductImages(files);
     throw error;
   }
+};
+
+export const listProductMediaHandler: RequestHandler = async (request, response) => {
+  const media = await listProductMedia(
+    requiredParam(request.params.productId, "productId"),
+  );
+  response.status(200).json({ success: true, data: { media } });
 };
 
 export const updateProductImageHandler: RequestHandler = async (

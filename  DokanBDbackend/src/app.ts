@@ -26,7 +26,7 @@ export const createApp = () => {
 
     securityHeaders(request, response, next);
   });
-  app.use(cors({ origin: env.WEB_ORIGIN }));
+  app.use(cors({ origin: env.WEB_ORIGIN, credentials: true }));
   app.use(express.json({ limit: "1mb" }));
   app.use(cookieParser());
   app.use(httpLogger);

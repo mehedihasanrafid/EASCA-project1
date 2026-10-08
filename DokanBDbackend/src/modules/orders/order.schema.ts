@@ -31,6 +31,10 @@ export const checkoutSchema = z.object({
   customerNote: z.string().trim().min(1).max(2000).nullable().optional(),
 });
 
+export const checkoutPreviewQuerySchema = z.object({
+  addressId: databaseIdSchema,
+});
+
 export const cancelOrderSchema = z.object({
   note: optionalNoteSchema,
 });
@@ -53,6 +57,7 @@ export const adminOrderStatusSchema = z.object({
 });
 
 export type CheckoutInput = z.infer<typeof checkoutSchema>;
+export type CheckoutPreviewQuery = z.infer<typeof checkoutPreviewQuerySchema>;
 export type CancelOrderInput = z.infer<typeof cancelOrderSchema>;
 export type CustomerOrderListQuery = z.infer<typeof customerOrderListQuerySchema>;
 export type AdminOrderListQuery = z.infer<typeof adminOrderListQuerySchema>;

@@ -1,7 +1,8 @@
-import type { EntityManager } from "typeorm";
+import { In, type EntityManager } from "typeorm";
 
 import { AppDataSource } from "../../database/data-source.js";
 import { AppError } from "../../utils/app-error.js";
+import { ProductMedia } from "../products/product-media.entity.js";
 import { ProductVariant } from "../products/product-variant.entity.js";
 import { User } from "../users/user.entity.js";
 import { CartItem } from "./cart-item.entity.js";
@@ -128,6 +129,28 @@ async function buildCartView(cartId: string, userId: string) {
     .orderBy("item.created_at", "ASC")
     .getMany();
 
+  const productIds = [...new Set(items.map((item) => item.productVariant.product.id))];
+  const imageMedia = productIds.length > 0
+    ? await AppDataSource.getRepository(ProductMedia).find({
+        where: {
+          productId: In(productIds),
+          mediaType: "IMAGE",
+        },
+        order: {
+          isPrimary: "DESC",
+          sortOrder: "ASC",
+          createdAt: "ASC",
+        },
+      })
+    : [];
+  const primaryImageByProduct = new Map<string, ProductMedia>();
+
+  for (const media of imageMedia) {
+    if (!primaryImageByProduct.has(media.productId)) {
+      primaryImageByProduct.set(media.productId, media);
+    }
+  }
+
   let subtotal = 0n;
   let totalQuantity = 0;
 
@@ -135,6 +158,7 @@ async function buildCartView(cartId: string, userId: string) {
     const unitPrice = toMinorUnits(item.productVariant.price);
     const lineTotal = unitPrice * BigInt(item.quantity);
     const product = item.productVariant.product;
+    const primaryImage = primaryImageByProduct.get(product.id);
     const available =
       item.productVariant.deletedAt === null &&
       product.deletedAt === null &&
@@ -164,6 +188,13 @@ async function buildCartView(cartId: string, userId: string) {
         id: product.id,
         name: product.name,
         slug: product.slug,
+        primaryImage: primaryImage
+          ? {
+              url: primaryImage.url,
+              thumbnailUrl: primaryImage.thumbnailUrl,
+              altText: primaryImage.altText,
+            }
+          : null,
       },
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,

@@ -215,6 +215,7 @@ const endpointDefinitions: EndpointDefinition[] = [
     tag: "Addresses",
     summary: "List the current user's addresses",
     auth: true,
+    responseSchema: "AddressListResponse",
   },
   {
     method: "post",
@@ -224,6 +225,7 @@ const endpointDefinitions: EndpointDefinition[] = [
     auth: true,
     body: "AddressRequest",
     success: "201",
+    responseSchema: "AddressResponse",
   },
   {
     method: "patch",
@@ -233,6 +235,7 @@ const endpointDefinitions: EndpointDefinition[] = [
     auth: true,
     parameters: [idParameter("addressId", "Address ID")],
     body: "UpdateAddressRequest",
+    responseSchema: "AddressResponse",
     notFound: true,
   },
   {
@@ -252,6 +255,7 @@ const endpointDefinitions: EndpointDefinition[] = [
     summary: "Make an owned address the default",
     auth: true,
     parameters: [idParameter("addressId", "Address ID")],
+    responseSchema: "AddressResponse",
     notFound: true,
   },
   {
@@ -332,6 +336,33 @@ const endpointDefinitions: EndpointDefinition[] = [
         default: "newest",
       }),
     ],
+  },
+  {
+    method: "get",
+    path: "/products/search-suggestions",
+    tag: "Products",
+    summary: "Return lightweight product suggestions for autocomplete",
+    description:
+      "Matches active products by name, slug, category, brand, or active variant SKU. Exact and name-prefix matches are ranked first.",
+    parameters: [
+      {
+        ...queryParameter("q", {
+          type: "string",
+          minLength: 2,
+          maxLength: 100,
+          example: "sung",
+        }),
+        required: true,
+      },
+      queryParameter("limit", {
+        type: "integer",
+        minimum: 1,
+        maximum: 10,
+        default: 8,
+      }),
+    ],
+    responseSchema: "ProductSuggestionListResponse",
+    rateLimited: true,
   },
   {
     method: "get",
@@ -524,6 +555,7 @@ const endpointDefinitions: EndpointDefinition[] = [
     tag: "Cart",
     summary: "Get the current active cart and server-calculated totals",
     auth: true,
+    responseSchema: "CartResponse",
   },
   {
     method: "post",
@@ -532,6 +564,7 @@ const endpointDefinitions: EndpointDefinition[] = [
     summary: "Add a product variant to the cart",
     auth: true,
     body: "AddCartItemRequest",
+    responseSchema: "CartResponse",
     notFound: true,
     conflict: true,
   },
@@ -541,6 +574,7 @@ const endpointDefinitions: EndpointDefinition[] = [
     tag: "Cart",
     summary: "Clear all cart items",
     auth: true,
+    responseSchema: "CartResponse",
   },
   {
     method: "patch",
@@ -550,6 +584,7 @@ const endpointDefinitions: EndpointDefinition[] = [
     auth: true,
     parameters: [idParameter("itemId", "Cart item ID")],
     body: "UpdateCartItemRequest",
+    responseSchema: "CartResponse",
     notFound: true,
     conflict: true,
   },
@@ -560,6 +595,7 @@ const endpointDefinitions: EndpointDefinition[] = [
     summary: "Remove an owned cart item",
     auth: true,
     parameters: [idParameter("itemId", "Cart item ID")],
+    responseSchema: "CartResponse",
     notFound: true,
   },
   {
@@ -572,6 +608,27 @@ const endpointDefinitions: EndpointDefinition[] = [
     auth: true,
     body: "CheckoutRequest",
     success: "201",
+    responseSchema: "OrderResponse",
+    notFound: true,
+    conflict: true,
+  },
+  {
+    method: "get",
+    path: "/orders/checkout-preview",
+    tag: "Orders",
+    summary: "Preview delivery charge and final total before checkout",
+    auth: true,
+    parameters: [
+      {
+        ...queryParameter(
+          "addressId",
+          { type: "string", pattern: "^[1-9][0-9]*$" },
+          "Owned delivery address ID",
+        ),
+        required: true,
+      },
+    ],
+    responseSchema: "CheckoutPreviewResponse",
     notFound: true,
     conflict: true,
   },
@@ -588,6 +645,7 @@ const endpointDefinitions: EndpointDefinition[] = [
         enum: ["PENDING", "CONFIRMED", "SHIPPED", "DELIVERED", "CANCELLED"],
       }),
     ],
+    responseSchema: "OrderListResponse",
   },
   {
     method: "get",
@@ -596,6 +654,7 @@ const endpointDefinitions: EndpointDefinition[] = [
     summary: "Get an owned order",
     auth: true,
     parameters: [idParameter("orderId", "Order ID")],
+    responseSchema: "OrderResponse",
     notFound: true,
   },
   {
@@ -607,6 +666,7 @@ const endpointDefinitions: EndpointDefinition[] = [
     parameters: [idParameter("orderId", "Order ID")],
     body: "CancelOrderRequest",
     bodyRequired: false,
+    responseSchema: "OrderResponse",
     notFound: true,
     conflict: true,
   },
@@ -630,6 +690,7 @@ const endpointDefinitions: EndpointDefinition[] = [
       queryParameter("userId", { type: "string" }),
       queryParameter("search", { type: "string", maxLength: 100 }),
     ],
+    responseSchema: "OrderListResponse",
   },
   {
     method: "get",
@@ -639,6 +700,7 @@ const endpointDefinitions: EndpointDefinition[] = [
     auth: true,
     admin: true,
     parameters: [idParameter("orderId", "Order ID")],
+    responseSchema: "OrderResponse",
     notFound: true,
   },
   {
@@ -650,6 +712,7 @@ const endpointDefinitions: EndpointDefinition[] = [
     admin: true,
     parameters: [idParameter("orderId", "Order ID")],
     body: "AdminOrderStatusRequest",
+    responseSchema: "OrderResponse",
     notFound: true,
     conflict: true,
   },
@@ -950,6 +1013,56 @@ export const openApiDocument = {
         minProperties: 1,
         properties: addressProperties,
       },
+      Address: {
+        type: "object",
+        required: [
+          "id",
+          "recipientName",
+          "phone",
+          "addressLine1",
+          "area",
+          "city",
+          "district",
+          "division",
+          "country",
+          "isInsideDhaka",
+          "isDefault",
+          "createdAt",
+          "updatedAt",
+        ],
+        properties: {
+          id: { type: "string", example: "3" },
+          ...addressProperties,
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+      },
+      AddressResponse: {
+        type: "object",
+        required: ["success", "data"],
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            required: ["address"],
+            properties: { address: schemaRef("Address") },
+          },
+        },
+      },
+      AddressListResponse: {
+        type: "object",
+        required: ["success", "data"],
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            required: ["addresses"],
+            properties: {
+              addresses: { type: "array", items: schemaRef("Address") },
+            },
+          },
+        },
+      },
       CategoryRequest: {
         type: "object",
         required: ["name"],
@@ -1052,6 +1165,76 @@ export const openApiDocument = {
           },
         },
       },
+      ProductSuggestion: {
+        type: "object",
+        required: [
+          "id",
+          "name",
+          "slug",
+          "price",
+          "regularPrice",
+          "discountPrice",
+          "category",
+          "brand",
+          "inStock",
+          "thumbnail",
+        ],
+        properties: {
+          id: { type: "string", example: "12" },
+          name: { type: "string", example: "Sunglasses" },
+          slug: { type: "string", example: "sunglasses" },
+          price: { type: "string", example: "1999.00" },
+          regularPrice: { type: "string", example: "2800.00" },
+          discountPrice: { type: "string", nullable: true, example: "1999.00" },
+          category: {
+            type: "object",
+            required: ["id", "name", "slug"],
+            properties: {
+              id: { type: "string", example: "3" },
+              name: { type: "string", example: "Accessories" },
+              slug: { type: "string", example: "accessories" },
+            },
+          },
+          brand: {
+            type: "object",
+            nullable: true,
+            required: ["id", "name", "slug"],
+            properties: {
+              id: { type: "string", example: "1" },
+              name: { type: "string", example: "DokanBD" },
+              slug: { type: "string", example: "dokanbd" },
+            },
+          },
+          inStock: { type: "boolean", example: true },
+          thumbnail: {
+            type: "object",
+            nullable: true,
+            required: ["url", "altText"],
+            properties: {
+              url: { type: "string", example: "/uploads/products/sunglasses.webp" },
+              altText: { type: "string", nullable: true },
+            },
+          },
+        },
+      },
+      ProductSuggestionListResponse: {
+        type: "object",
+        required: ["success", "data"],
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            required: ["suggestions"],
+            properties: {
+              suggestions: {
+                type: "array",
+                maxItems: 10,
+                items: schemaRef("ProductSuggestion"),
+              },
+            },
+          },
+        },
+      },
       AddCartItemRequest: {
         type: "object",
         required: ["productVariantId", "quantity"],
@@ -1065,12 +1248,256 @@ export const openApiDocument = {
         required: ["quantity"],
         properties: { quantity: { type: "integer", minimum: 1 } },
       },
+      Cart: {
+        type: "object",
+        required: ["id", "status", "items", "totals", "createdAt", "updatedAt"],
+        properties: {
+          id: { type: "string", example: "1" },
+          status: { type: "string", example: "ACTIVE" },
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              required: [
+                "id",
+                "quantity",
+                "unitPrice",
+                "lineTotal",
+                "available",
+                "productVariant",
+                "product",
+                "createdAt",
+                "updatedAt",
+              ],
+              properties: {
+                id: { type: "string", example: "8" },
+                quantity: { type: "integer", minimum: 1, example: 2 },
+                unitPrice: { type: "string", example: "1200.00" },
+                lineTotal: { type: "string", example: "2400.00" },
+                available: { type: "boolean", example: true },
+                productVariant: {
+                  type: "object",
+                  required: ["id", "sku", "stockQuantity"],
+                  properties: {
+                    id: { type: "string", example: "3" },
+                    sku: { type: "string", example: "TSHIRT-BLK-M" },
+                    barcode: { type: "string", nullable: true },
+                    variantName: { type: "string", nullable: true },
+                    color: { type: "string", nullable: true },
+                    size: { type: "string", nullable: true },
+                    stockQuantity: { type: "integer", minimum: 0 },
+                  },
+                },
+                product: {
+                  type: "object",
+                  required: ["id", "name", "slug", "primaryImage"],
+                  properties: {
+                    id: { type: "string", example: "12" },
+                    name: { type: "string", example: "Premium T-Shirt" },
+                    slug: { type: "string", example: "premium-t-shirt" },
+                    primaryImage: {
+                      type: "object",
+                      nullable: true,
+                      required: ["url"],
+                      properties: {
+                        url: { type: "string", example: "/uploads/products/example.webp" },
+                        thumbnailUrl: { type: "string", nullable: true },
+                        altText: { type: "string", nullable: true },
+                      },
+                    },
+                  },
+                },
+                createdAt: { type: "string", format: "date-time" },
+                updatedAt: { type: "string", format: "date-time" },
+              },
+            },
+          },
+          totals: {
+            type: "object",
+            required: ["itemCount", "totalQuantity", "subtotal", "currency"],
+            properties: {
+              itemCount: { type: "integer", minimum: 0 },
+              totalQuantity: { type: "integer", minimum: 0 },
+              subtotal: { type: "string", example: "2400.00" },
+              currency: { type: "string", example: "BDT" },
+            },
+          },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+      },
+      CartResponse: {
+        type: "object",
+        required: ["success", "data"],
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            required: ["cart"],
+            properties: { cart: schemaRef("Cart") },
+          },
+        },
+      },
       CheckoutRequest: {
         type: "object",
         required: ["addressId"],
         properties: {
           addressId: { type: "string", example: "1" },
           customerNote: { type: "string", nullable: true, maxLength: 2000 },
+        },
+      },
+      Order: {
+        type: "object",
+        required: [
+          "id",
+          "orderNumber",
+          "orderStatus",
+          "paymentMethod",
+          "paymentStatus",
+          "subtotal",
+          "discountTotal",
+          "deliveryCharge",
+          "grandTotal",
+          "currency",
+          "recipientName",
+          "recipientPhone",
+          "deliveryAddress",
+          "placedAt",
+          "items",
+          "statusHistory",
+        ],
+        properties: {
+          id: { type: "string", example: "25" },
+          orderNumber: { type: "string", example: "DBD-20261008-1A2B3C4D5E6F" },
+          orderStatus: { type: "string", enum: ["PENDING", "CONFIRMED", "SHIPPED", "DELIVERED", "CANCELLED"] },
+          paymentMethod: { type: "string", example: "COD" },
+          paymentStatus: { type: "string", enum: ["PENDING", "PAID", "FAILED", "REFUNDED"] },
+          subtotal: { type: "string", example: "2400.00" },
+          discountTotal: { type: "string", example: "0.00" },
+          deliveryCharge: { type: "string", example: "80.00" },
+          grandTotal: { type: "string", example: "2480.00" },
+          currency: { type: "string", example: "BDT" },
+          recipientName: { type: "string", example: "Mehedi Hasan" },
+          recipientPhone: bangladeshPhone,
+          deliveryAddress: {
+            type: "object",
+            properties: addressProperties,
+          },
+          customerNote: { type: "string", nullable: true },
+          adminNote: { type: "string", nullable: true },
+          placedAt: { type: "string", format: "date-time" },
+          confirmedAt: { type: "string", format: "date-time", nullable: true },
+          shippedAt: { type: "string", format: "date-time", nullable: true },
+          deliveredAt: { type: "string", format: "date-time", nullable: true },
+          cancelledAt: { type: "string", format: "date-time", nullable: true },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+          itemCount: { type: "integer", minimum: 0 },
+          totalQuantity: { type: "integer", minimum: 0 },
+          user: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              email: { type: "string", format: "email", nullable: true },
+              phone: bangladeshPhone,
+            },
+          },
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["id", "productName", "sku", "quantity", "unitPrice", "lineTotal"],
+              properties: {
+                id: { type: "string" },
+                productId: { type: "string", nullable: true },
+                productVariantId: { type: "string", nullable: true },
+                productName: { type: "string" },
+                variantName: { type: "string", nullable: true },
+                sku: { type: "string" },
+                barcode: { type: "string", nullable: true },
+                quantity: { type: "integer", minimum: 1 },
+                unitPrice: { type: "string" },
+                discountAmount: { type: "string" },
+                lineTotal: { type: "string" },
+              },
+            },
+          },
+          statusHistory: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["id", "newStatus", "createdAt"],
+              properties: {
+                id: { type: "string" },
+                oldStatus: { type: "string", nullable: true },
+                newStatus: { type: "string" },
+                createdAt: { type: "string", format: "date-time" },
+              },
+            },
+          },
+        },
+      },
+      OrderResponse: {
+        type: "object",
+        required: ["success", "data"],
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            required: ["order"],
+            properties: { order: schemaRef("Order") },
+          },
+        },
+      },
+      OrderListResponse: {
+        type: "object",
+        required: ["success", "data"],
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            required: ["orders", "pagination"],
+            properties: {
+              orders: { type: "array", items: schemaRef("Order") },
+              pagination: {
+                type: "object",
+                required: ["page", "limit", "total", "totalPages"],
+                properties: {
+                  page: { type: "integer", minimum: 1 },
+                  limit: { type: "integer", minimum: 1 },
+                  total: { type: "integer", minimum: 0 },
+                  totalPages: { type: "integer", minimum: 0 },
+                },
+              },
+            },
+          },
+        },
+      },
+      CheckoutPreview: {
+        type: "object",
+        required: ["addressId", "isInsideDhaka", "subtotal", "discountTotal", "deliveryCharge", "grandTotal", "currency", "paymentMethod"],
+        properties: {
+          addressId: { type: "string", example: "3" },
+          isInsideDhaka: { type: "boolean", example: true },
+          subtotal: { type: "string", example: "2400.00" },
+          discountTotal: { type: "string", example: "0.00" },
+          deliveryCharge: { type: "string", example: "80.00" },
+          grandTotal: { type: "string", example: "2480.00" },
+          currency: { type: "string", example: "BDT" },
+          paymentMethod: { type: "string", example: "COD" },
+        },
+      },
+      CheckoutPreviewResponse: {
+        type: "object",
+        required: ["success", "data"],
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            required: ["preview"],
+            properties: { preview: schemaRef("CheckoutPreview") },
+          },
         },
       },
       CancelOrderRequest: {

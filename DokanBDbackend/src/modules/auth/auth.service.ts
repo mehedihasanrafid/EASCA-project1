@@ -87,11 +87,11 @@ async function createRefreshSession(
 }
 
 function verificationUrl(rawToken: string) {
-  return `${env.WEB_ORIGIN}/verify-email?token=${rawToken}`;
+  return `${env.WEB_ORIGIN.replace(/\/+$/, "")}/verify-email?token=${rawToken}`;
 }
 
 function passwordResetUrl(rawToken: string) {
-  return `${env.WEB_ORIGIN}/reset-password?token=${rawToken}`;
+  return `${env.WEB_ORIGIN.replace(/\/+$/, "")}/reset-password?token=${rawToken}`;
 }
 
 async function deliverVerificationEmail(user: User, rawToken: string) {

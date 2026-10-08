@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Product, productApi } from '../api/products';
 import { ProductCard } from '../components/ProductCard';
+import { ProductSearch } from '../features/catalog/components/ProductSearch';
+import { CategoryNavigation } from '../features/catalog/components/CategoryNavigation';
+import { catalogApi, CategoryOption } from '../api/catalog';
 
 export const Home: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -23,12 +28,30 @@ export const Home: React.FC = () => {
     fetchProducts();
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    catalogApi
+      .getCategories(controller.signal)
+      .then(setCategories)
+      .catch(() => {
+        if (!controller.signal.aborted) setCategories([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCategoriesLoading(false);
+      });
+
+    return () => controller.abort();
+  }, []);
+
   return (
     <div className="home-page">
       <div className="hero-section">
         <h1>Welcome to DokanBD</h1>
         <p>Discover premium products at unbeatable prices.</p>
+        <ProductSearch className="mt-8" />
       </div>
+
+      <CategoryNavigation categories={categories} loading={categoriesLoading} />
 
       <div className="product-section">
         <h2 className="section-title">New Arrivals</h2>

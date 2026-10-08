@@ -3,6 +3,7 @@ import type { Request, RequestHandler } from "express";
 import { AppError } from "../../utils/app-error.js";
 import {
   cancelOrderSchema,
+  checkoutPreviewQuerySchema,
   checkoutSchema,
   customerOrderListQuerySchema,
   orderIdParamsSchema,
@@ -12,6 +13,7 @@ import {
   checkout,
   getCustomerOrder,
   listCustomerOrders,
+  previewCheckout,
 } from "./order.service.js";
 
 function authenticatedUserId(request: Request) {
@@ -27,6 +29,13 @@ export const checkoutCart: RequestHandler = async (request, response) => {
   const order = await checkout(authenticatedUserId(request), input);
 
   response.status(201).json({ success: true, data: { order } });
+};
+
+export const getCheckoutPreview: RequestHandler = async (request, response) => {
+  const input = checkoutPreviewQuerySchema.parse(request.query);
+  const preview = await previewCheckout(authenticatedUserId(request), input);
+
+  response.status(200).json({ success: true, data: { preview } });
 };
 
 export const listOwnOrders: RequestHandler = async (request, response) => {

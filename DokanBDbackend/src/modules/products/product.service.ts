@@ -14,6 +14,7 @@ import type {
   AdminProductListQuery,
   CreateProductInput,
   CreateProductVariantInput,
+  ProductSearchSuggestionsQuery,
   PublicProductListQuery,
   UpdateProductInput,
   UpdateProductVariantInput,
@@ -195,6 +196,31 @@ function applySearchFilter(
     "(LOWER(product.name) LIKE :search OR LOWER(product.slug) LIKE :search)",
     { search: `%${search.toLowerCase()}%` },
   );
+}
+
+function applyPublicSearchFilter(
+  query: SelectQueryBuilder<Product>,
+  search: string | undefined,
+) {
+  if (!search) return;
+
+  query
+    .leftJoin(
+      ProductVariant,
+      "searchVariant",
+      "searchVariant.productId = product.id AND searchVariant.isActive = :active AND searchVariant.deletedAt IS NULL",
+    )
+    .andWhere(
+      `(
+        LOWER(product.name) LIKE :search
+        OR LOWER(product.slug) LIKE :search
+        OR LOWER(category.name) LIKE :search
+        OR LOWER(COALESCE(brand.name, '')) LIKE :search
+        OR LOWER(searchVariant.sku) LIKE :search
+      )`,
+      { search: `%${search.toLowerCase()}%` },
+    )
+    .distinct(true);
 }
 
 async function loadProductsByIds(ids: string[], includeDeleted: boolean) {
@@ -396,11 +422,12 @@ export async function listPublicProducts(input: PublicProductListQuery) {
   const query = productRepository()
     .createQueryBuilder("product")
     .innerJoin("product.category", "category")
+    .leftJoin("product.brand", "brand")
     .where("product.status = :status", { status: "ACTIVE" })
     .andWhere("product.isActive = :active", { active: true })
     .andWhere("category.isActive = :active", { active: true });
 
-  applySearchFilter(query, input.search);
+  applyPublicSearchFilter(query, input.search);
   applyCategoryFilter(query, input.category);
 
   if (input.minPrice !== undefined) {
@@ -452,6 +479,73 @@ export async function listPublicProducts(input: PublicProductListQuery) {
       totalPages: Math.ceil(total / input.limit),
     },
   };
+}
+
+export async function getProductSearchSuggestions(
+  input: ProductSearchSuggestionsQuery,
+) {
+  const normalizedQuery = input.q.toLowerCase();
+  const query = productRepository()
+    .createQueryBuilder("product")
+    .innerJoin("product.category", "category")
+    .leftJoin("product.brand", "brand")
+    .where("product.status = :status", { status: "ACTIVE" })
+    .andWhere("product.isActive = :active", { active: true })
+    .andWhere("category.isActive = :active", { active: true });
+
+  applyPublicSearchFilter(query, input.q);
+
+  const rawIds = await query
+    .select("product.id", "id")
+    .addSelect(
+      `CASE
+        WHEN LOWER(product.name) = :exactSearch THEN 0
+        WHEN LOWER(product.name) LIKE :prefixSearch THEN 1
+        ELSE 2
+      END`,
+      "searchRank",
+    )
+    .setParameters({
+      exactSearch: normalizedQuery,
+      prefixSearch: `${normalizedQuery}%`,
+    })
+    .orderBy("searchRank", "ASC")
+    .addOrderBy("product.name", "ASC")
+    .addOrderBy("product.id", "ASC")
+    .limit(input.limit)
+    .getRawMany<{ id: string | number }>();
+  const ids = rawIds.map(({ id }) => String(id));
+  const products = await loadProductsByIds(ids, false);
+  const associations = await loadAssociations(ids, { publicOnly: true });
+
+  return products.map((product) => {
+    const publicProduct = toPublicProduct(
+      product,
+      associations.variantsByProduct.get(product.id) ?? [],
+      associations.mediaByProduct.get(product.id) ?? [],
+      false,
+    );
+
+    return {
+      id: publicProduct.id,
+      name: publicProduct.name,
+      slug: publicProduct.slug,
+      price: publicProduct.price,
+      regularPrice: publicProduct.regularPrice,
+      discountPrice: publicProduct.discountPrice,
+      category: publicProduct.category,
+      brand: publicProduct.brand,
+      inStock: publicProduct.inStock,
+      thumbnail: publicProduct.primaryImage
+        ? {
+            url:
+              publicProduct.primaryImage.thumbnailUrl ??
+              publicProduct.primaryImage.url,
+            altText: publicProduct.primaryImage.altText,
+          }
+        : null,
+    };
+  });
 }
 
 export async function getPublicProduct(identifier: string) {

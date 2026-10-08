@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { rateLimit } from "express-rate-limit";
 
 import { requireAuth } from "../auth/auth.middleware.js";
 import { requireRole } from "../auth/authorization.middleware.js";
@@ -8,6 +9,7 @@ import {
   deleteProductForAdmin,
   deleteVariantForAdmin,
   listProducts,
+  listProductSearchSuggestions,
   listProductsForAdmin,
   restoreProductForAdmin,
   showProduct,
@@ -26,7 +28,19 @@ import { productMediaUpload } from "./product-media-upload.middleware.js";
 export const productRouter = Router();
 export const adminProductRouter = Router();
 
+const productSearchLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 productRouter.get("/", listProducts);
+productRouter.get(
+  "/search-suggestions",
+  productSearchLimiter,
+  listProductSearchSuggestions,
+);
 productRouter.get("/:identifier", showProduct);
 
 adminProductRouter.use(requireAuth, requireRole("ADMIN", "OWNER"));

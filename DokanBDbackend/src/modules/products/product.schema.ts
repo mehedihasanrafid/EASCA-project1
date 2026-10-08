@@ -32,6 +32,11 @@ export const publicProductListQuerySchema = z
     { message: "minPrice cannot be greater than maxPrice.", path: ["minPrice"] },
   );
 
+export const productSearchSuggestionsQuerySchema = z.object({
+  q: z.string().trim().min(2).max(100),
+  limit: z.coerce.number().int().min(1).max(10).default(8),
+});
+
 export const adminProductListQuerySchema = z.object({
   search: z.string().trim().min(1).max(100).optional(),
   category: z.string().trim().min(1).max(120).optional(),
@@ -165,6 +170,9 @@ export const updateProductVariantSchema = z
 export type PublicProductListQuery = z.infer<
   typeof publicProductListQuerySchema
 >;
+export type ProductSearchSuggestionsQuery = z.infer<
+  typeof productSearchSuggestionsQuerySchema
+>;
 export type AdminProductListQuery = z.infer<
   typeof adminProductListQuerySchema
 >;
@@ -176,4 +184,3 @@ export type CreateProductVariantInput = z.infer<
 export type UpdateProductVariantInput = z.infer<
   typeof updateProductVariantSchema
 >;
-

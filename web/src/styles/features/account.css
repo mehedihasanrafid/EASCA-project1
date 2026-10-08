@@ -1,0 +1,226 @@
+/* Customer address management */
+.account-page,
+.checkout-page {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 3rem 2rem 5rem;
+}
+
+.account-page-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.account-page-heading .product-back-link {
+  margin-bottom: 1.5rem;
+}
+
+.account-page-heading h1,
+.checkout-heading h1 {
+  margin: 0.55rem 0 0.5rem;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.1;
+}
+
+.account-page-heading p:last-child,
+.checkout-heading > p:last-child {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.account-page-heading .btn {
+  gap: 0.45rem;
+  white-space: nowrap;
+}
+
+.address-form {
+  margin-bottom: 2rem;
+  padding: 2rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 10px 30px rgba(28, 67, 43, 0.06);
+}
+
+.address-form-heading,
+.address-form-actions,
+.address-card-heading,
+.address-card-heading > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.address-form-heading h2 {
+  margin: 0 0 0.3rem;
+}
+
+.address-form-heading p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.address-form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-top: 1.75rem;
+}
+
+.address-field-wide {
+  grid-column: span 2;
+}
+
+.address-default-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--text-main);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.address-default-checkbox input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--primary);
+}
+
+.address-form-actions {
+  justify-content: flex-end;
+  margin-top: 1.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.address-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.address-card {
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.address-card.is-default {
+  border-color: rgba(21, 115, 71, 0.5);
+  box-shadow: 0 0 0 3px rgba(21, 115, 71, 0.08);
+}
+
+.address-label,
+.default-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.address-label {
+  color: var(--primary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.default-badge {
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  color: var(--primary);
+  background: var(--success-bg);
+}
+
+.address-card h2 {
+  margin: 1rem 0 0.65rem;
+  font-size: 1.15rem;
+}
+
+.address-card p {
+  margin: 0.3rem 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.address-card .address-phone {
+  margin-top: 0.75rem;
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.address-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.address-card-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.6rem;
+  border: 0;
+  border-radius: 0.45rem;
+  color: var(--primary);
+  background: transparent;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.address-card-actions button:hover:not(:disabled) {
+  background: var(--success-bg);
+}
+
+.address-card-actions .danger-action {
+  color: var(--error);
+}
+
+.address-card-actions .danger-action:hover:not(:disabled) {
+  background: var(--error-bg);
+}
+
+.address-card-actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.address-empty,
+.account-loading {
+  padding: 4rem 2rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text-muted);
+  background: var(--surface);
+  text-align: center;
+}
+
+.address-empty > svg {
+  color: var(--primary);
+}
+
+.address-empty h2 {
+  margin: 1rem 0 0.5rem;
+  color: var(--text-main);
+}
+
+.address-empty p {
+  margin: 0 0 1.5rem;
+}
+
+.address-empty .btn {
+  gap: 0.45rem;
+}
+

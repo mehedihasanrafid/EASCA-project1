@@ -8,6 +8,7 @@ import {
   productIdentifierParamsSchema,
   productIdForVariantParamsSchema,
   productIdParamsSchema,
+  productSearchSuggestionsQuerySchema,
   productVariantParamsSchema,
   publicProductListQuerySchema,
   updateProductSchema,
@@ -20,6 +21,7 @@ import {
   deleteProductVariant,
   getAdminProduct,
   getPublicProduct,
+  getProductSearchSuggestions,
   listAdminProducts,
   listPublicProducts,
   restoreProduct,
@@ -44,6 +46,16 @@ export const listProducts: RequestHandler = async (request, response) => {
   const result = await listPublicProducts(input);
 
   response.status(200).json({ success: true, data: result });
+};
+
+export const listProductSearchSuggestions: RequestHandler = async (
+  request,
+  response,
+) => {
+  const input = productSearchSuggestionsQuerySchema.parse(request.query);
+  const suggestions = await getProductSearchSuggestions(input);
+
+  response.status(200).json({ success: true, data: { suggestions } });
 };
 
 export const showProduct: RequestHandler = async (request, response) => {
@@ -158,4 +170,3 @@ export const deleteVariantForAdmin: RequestHandler = async (
 
   response.status(204).send();
 };
-

@@ -39,6 +39,9 @@ export class Category {
   @Column({ name: "sort_order", type: "int", default: 0 })
   sortOrder!: number;
 
+  @Column({ name: "show_on_homepage", type: "boolean", default: false })
+  showOnHomepage!: boolean;
+
   @CreateDateColumn({ name: "created_at", type: "datetime" })
   createdAt!: Date;
 

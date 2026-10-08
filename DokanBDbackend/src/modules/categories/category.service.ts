@@ -18,6 +18,7 @@ export interface CategoryTreeItem {
   displayImageUrl: string | null;
   productCount: number;
   sortOrder: number;
+  showOnHomepage: boolean;
   children: CategoryTreeItem[];
 }
 
@@ -124,6 +125,7 @@ function toAdminCategory(category: Category) {
     imageUrl: category.imageUrl,
     isActive: category.isActive,
     sortOrder: category.sortOrder,
+    showOnHomepage: category.showOnHomepage,
     createdAt: category.createdAt,
     updatedAt: category.updatedAt,
     deletedAt: category.deletedAt,
@@ -217,6 +219,7 @@ export async function listPublicCategoryTree() {
       displayImageUrl: category.imageUrl ?? productSummary?.displayImageUrl ?? null,
       productCount: productSummary?.productCount ?? 0,
       sortOrder: category.sortOrder,
+      showOnHomepage: category.showOnHomepage,
       children: [],
     });
   }
@@ -263,6 +266,7 @@ export async function createCategory(input: CreateCategoryInput) {
     parentId: input.parentId ?? null,
     isActive: input.isActive ?? true,
     sortOrder: input.sortOrder ?? 0,
+    showOnHomepage: input.showOnHomepage ?? false,
   });
 
   await repository.save(category);
@@ -299,6 +303,9 @@ export async function updateCategory(
   if (input.imageUrl !== undefined) category.imageUrl = input.imageUrl;
   if (input.isActive !== undefined) category.isActive = input.isActive;
   if (input.sortOrder !== undefined) category.sortOrder = input.sortOrder;
+  if (input.showOnHomepage !== undefined) {
+    category.showOnHomepage = input.showOnHomepage;
+  }
 
   await repository.save(category);
   return toAdminCategory(category);

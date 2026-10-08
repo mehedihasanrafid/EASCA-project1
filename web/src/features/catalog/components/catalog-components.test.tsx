@@ -20,6 +20,7 @@ const categories: CategoryOption[] = [
     displayImageUrl: "/uploads/products/sunglasses.webp",
     productCount: 3,
     sortOrder: 1,
+    showOnHomepage: true,
     children: [],
   },
 ];

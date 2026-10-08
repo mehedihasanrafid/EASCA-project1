@@ -7,7 +7,10 @@ import {
   adminCategoryRouter,
   categoryRouter,
 } from "../modules/categories/category.routes.js";
-import { brandRouter } from "../modules/brands/brand.routes.js";
+import {
+  adminBrandRouter,
+  brandRouter,
+} from "../modules/brands/brand.routes.js";
 import { healthRouter } from "../modules/health/health.routes.js";
 import { adminOrderRouter } from "../modules/orders/order-admin.routes.js";
 import { orderRouter } from "../modules/orders/order.routes.js";
@@ -16,6 +19,7 @@ import {
   productRouter,
 } from "../modules/products/product.routes.js";
 import { userRouter } from "../modules/users/user.routes.js";
+import { adminProductTypeRouter } from "../modules/product-types/product-type.routes.js";
 
 export const v1Router = Router();
 
@@ -28,6 +32,8 @@ v1Router.use("/categories", categoryRouter);
 v1Router.use("/brands", brandRouter);
 v1Router.use("/products", productRouter);
 v1Router.use("/admin/categories", adminCategoryRouter);
+v1Router.use("/admin/brands", adminBrandRouter);
+v1Router.use("/admin/product-types", adminProductTypeRouter);
 v1Router.use("/admin/products", adminProductRouter);
 v1Router.use("/orders", orderRouter);
 v1Router.use("/admin/orders", adminOrderRouter);

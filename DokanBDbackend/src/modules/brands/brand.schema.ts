@@ -8,11 +8,9 @@ const nullableUrlSchema = z
   .union([z.string().trim().url().max(500), z.null()])
   .optional();
 
-export const categoryIdParamsSchema = z.object({
-  id: entityIdSchema,
-});
+export const brandIdParamsSchema = z.object({ id: entityIdSchema });
 
-export const createCategorySchema = z
+export const createBrandSchema = z
   .object({
     name: z.string().trim().min(2).max(100),
     slug: z
@@ -25,27 +23,24 @@ export const createCategorySchema = z
         "Use lowercase letters, numbers, and single hyphens.",
       )
       .optional(),
+    logoUrl: nullableUrlSchema,
     description: z.union([z.string().trim().max(10_000), z.null()]).optional(),
-    imageUrl: nullableUrlSchema,
-    parentId: z.union([entityIdSchema, z.null()]).optional(),
     isActive: z.boolean().optional(),
-    showOnHomepage: z.boolean().optional(),
-    sortOrder: z.coerce.number().int().min(0).max(1_000_000).optional(),
   })
   .strict();
 
-export const updateCategorySchema = createCategorySchema
+export const updateBrandSchema = createBrandSchema
   .partial()
   .refine((input) => Object.keys(input).length > 0, {
-    message: "Provide at least one category field to update.",
+    message: "Provide at least one brand field to update.",
   });
 
-export const adminCategoryListQuerySchema = z.object({
+export const adminBrandListQuerySchema = z.object({
   includeDeleted: z
     .enum(["true", "false"])
     .default("false")
     .transform((value) => value === "true"),
 });
 
-export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
-export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
+export type CreateBrandInput = z.infer<typeof createBrandSchema>;
+export type UpdateBrandInput = z.infer<typeof updateBrandSchema>;

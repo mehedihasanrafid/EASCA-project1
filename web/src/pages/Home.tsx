@@ -51,7 +51,10 @@ export const Home: React.FC = () => {
         <ProductSearch className="mt-8" />
       </div>
 
-      <CategoryNavigation categories={categories} loading={categoriesLoading} />
+      <CategoryNavigation
+        categories={categories.filter((category) => category.showOnHomepage)}
+        loading={categoriesLoading}
+      />
 
       <div className="product-section">
         <h2 className="section-title">New Arrivals</h2>

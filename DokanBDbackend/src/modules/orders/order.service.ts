@@ -3,11 +3,17 @@ import { randomBytes } from "node:crypto";
 import type { EntityManager, SelectQueryBuilder } from "typeorm";
 
 import { env } from "../../config/env.js";
+import { logger } from "../../config/logger.js";
 import { AppDataSource } from "../../database/data-source.js";
+import {
+  sendOrderPlacedEmail,
+  sendOrderStatusEmail,
+} from "../../services/mail.service.js";
 import { AppError } from "../../utils/app-error.js";
 import { Address } from "../addresses/address.entity.js";
 import { CartItem } from "../carts/cart-item.entity.js";
 import { Cart } from "../carts/cart.entity.js";
+import { getActiveCart } from "../carts/cart.service.js";
 import { InventoryMovement } from "../inventory/inventory-movement.entity.js";
 import { ProductVariant } from "../products/product-variant.entity.js";
 import { User } from "../users/user.entity.js";
@@ -19,6 +25,7 @@ import type {
   AdminOrderStatusInput,
   CancelOrderInput,
   CheckoutInput,
+  CheckoutPreviewQuery,
   CustomerOrderListQuery,
   OrderStatus,
 } from "./order.schema.js";
@@ -35,6 +42,46 @@ const NEXT_ORDER_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
   CONFIRMED: "SHIPPED",
   SHIPPED: "DELIVERED",
 };
+
+async function deliverOrderEmail(
+  userId: string,
+  order: {
+    id: string;
+    orderNumber: string;
+    orderStatus: string;
+    grandTotal: string;
+    currency: string;
+  },
+  kind: "PLACED" | "STATUS",
+) {
+  if (!env.SMTP_HOST || !env.MAIL_FROM) return;
+
+  const user = await AppDataSource.getRepository(User).findOneBy({ id: userId });
+  if (!user?.email) return;
+
+  const input = {
+    to: user.email,
+    recipientName: user.name,
+    orderNumber: order.orderNumber,
+    orderStatus: order.orderStatus,
+    grandTotal: order.grandTotal,
+    currency: order.currency,
+    orderUrl: `${env.WEB_ORIGIN.replace(/\/+$/, "")}/account/orders/${order.id}`,
+  };
+
+  try {
+    if (kind === "PLACED") {
+      await sendOrderPlacedEmail(input);
+    } else {
+      await sendOrderStatusEmail(input);
+    }
+  } catch (error) {
+    logger.error(
+      { error, userId, orderId: order.id, orderStatus: order.orderStatus },
+      "Order email delivery failed",
+    );
+  }
+}
 
 function toMinorUnits(value: string) {
   const match = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(value);
@@ -387,6 +434,61 @@ async function cancelLockedOrder(
   );
 }
 
+export async function previewCheckout(
+  userId: string,
+  input: CheckoutPreviewQuery,
+) {
+  const address = await AppDataSource.getRepository(Address).findOneBy({
+    id: input.addressId,
+    userId,
+  });
+
+  if (!address) {
+    throw new AppError(404, "ADDRESS_NOT_FOUND", "Address not found.");
+  }
+
+  const cart = await getActiveCart(userId);
+
+  if (cart.items.length === 0) {
+    throw new AppError(409, "CART_EMPTY", "Your cart is empty.");
+  }
+
+  if (cart.items.some((item) => !item.available)) {
+    throw new AppError(
+      409,
+      "CART_ITEM_UNAVAILABLE",
+      "One or more cart items are no longer available.",
+    );
+  }
+
+  const subtotal = toMinorUnits(cart.totals.subtotal);
+  const deliveryCharge = numberToMinorUnits(
+    address.isInsideDhaka
+      ? env.DELIVERY_INSIDE_DHAKA
+      : env.DELIVERY_OUTSIDE_DHAKA,
+  );
+  const grandTotal = subtotal + deliveryCharge;
+
+  if (grandTotal > MAX_MONEY_MINOR_UNITS) {
+    throw new AppError(
+      409,
+      "ORDER_TOTAL_TOO_LARGE",
+      "The cart total is too large to create an order.",
+    );
+  }
+
+  return {
+    addressId: address.id,
+    isInsideDhaka: address.isInsideDhaka,
+    subtotal: formatMinorUnits(subtotal),
+    discountTotal: "0.00",
+    deliveryCharge: formatMinorUnits(deliveryCharge),
+    grandTotal: formatMinorUnits(grandTotal),
+    currency: CURRENCY,
+    paymentMethod: PAYMENT_METHOD,
+  };
+}
+
 export async function checkout(userId: string, input: CheckoutInput) {
   const orderId = await AppDataSource.transaction(async (manager) => {
     await lockActiveUser(manager, userId);
@@ -586,7 +688,9 @@ export async function checkout(userId: string, input: CheckoutInput) {
     return order.id;
   });
 
-  return getCustomerOrder(userId, orderId);
+  const order = await getCustomerOrder(userId, orderId);
+  await deliverOrderEmail(userId, order, "PLACED");
+  return order;
 }
 
 export async function listCustomerOrders(
@@ -661,7 +765,9 @@ export async function cancelCustomerOrder(
     );
   });
 
-  return getCustomerOrder(userId, orderId);
+  const order = await getCustomerOrder(userId, orderId);
+  await deliverOrderEmail(userId, order, "STATUS");
+  return order;
 }
 
 export async function listAdminOrders(filters: AdminOrderListQuery) {
@@ -777,5 +883,9 @@ export async function updateAdminOrderStatus(
     );
   });
 
-  return getAdminOrder(orderId);
+  const order = await getAdminOrder(orderId);
+  if (order.user) {
+    await deliverOrderEmail(order.user.id, order, "STATUS");
+  }
+  return order;
 }

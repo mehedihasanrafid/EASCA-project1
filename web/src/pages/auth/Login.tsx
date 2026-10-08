@@ -61,7 +61,12 @@ export const Login: React.FC = () => {
           </div>
           
           <div className="form-group">
-            <label htmlFor="password">Password</label>
+            <div className="form-label-row">
+              <label htmlFor="password">Password</label>
+              <Link to="/forgot-password" className="text-link auth-small-link">
+                Forgot password?
+              </Link>
+            </div>
             <input
               id="password"
               type="password"

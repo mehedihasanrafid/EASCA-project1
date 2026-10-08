@@ -2,10 +2,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, CheckCircle, ChevronLeft, ChevronRight, Play, ShoppingCart } from "lucide-react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
-import { cartApi } from "../../api/cart";
 import { ApiException } from "../../api/client";
 import { Product, productApi } from "../../api/products";
 import { useAuth } from "../../features/auth/AuthContext";
+import { useCart } from "../../features/cart/CartContext";
 
 const priceFormatter = new Intl.NumberFormat("en-BD", {
   style: "currency",
@@ -16,6 +16,8 @@ const priceFormatter = new Intl.NumberFormat("en-BD", {
 export const ProductDetail: React.FC = () => {
   const { slug = "" } = useParams();
   const { user } = useAuth();
+  const { addItem } = useCart();
+  const isAdmin = user?.role.code === "ADMIN" || user?.role.code === "OWNER";
   const navigate = useNavigate();
   const location = useLocation();
   const [product, setProduct] = useState<Product | null>(null);
@@ -81,6 +83,11 @@ export const ProductDetail: React.FC = () => {
       return;
     }
 
+    if (isAdmin) {
+      setError("Use a customer account to add products to a cart.");
+      return;
+    }
+
     if (!selectedVariant) {
       setError("Choose an available product option.");
       return;
@@ -91,7 +98,7 @@ export const ProductDetail: React.FC = () => {
     setMessage("");
 
     try {
-      await cartApi.addItem(selectedVariant.id, quantity);
+      await addItem(selectedVariant.id, quantity);
       setMessage(`${quantity} item${quantity === 1 ? "" : "s"} added to your cart.`);
     } catch (requestError) {
       setError(
@@ -219,11 +226,11 @@ export const ProductDetail: React.FC = () => {
             <button
               type="button"
               className="btn btn-primary product-cart-button"
-              disabled={adding || !selectedVariant?.inStock}
+              disabled={adding || !selectedVariant?.inStock || isAdmin}
               onClick={handleAddToCart}
             >
               <ShoppingCart size={19} />
-              {adding ? "Adding..." : user ? "Add to cart" : "Log in to add"}
+              {adding ? "Adding..." : isAdmin ? "Customer cart only" : user ? "Add to cart" : "Log in to add"}
             </button>
           </div>
 

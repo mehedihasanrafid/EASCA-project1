@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import type { RegisterInput } from "../../api/auth";
 import { useAuth } from "../../features/auth/AuthContext";
 import { ApiException } from "../../api/client";
-import { AlertCircle, CheckCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 
 export const Register: React.FC = () => {
   const [name, setName] = useState("");
@@ -13,8 +14,7 @@ export const Register: React.FC = () => {
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  
+
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -24,17 +24,20 @@ export const Register: React.FC = () => {
     setFieldErrors({});
     setLoading(true);
 
-    const data: Record<string, string> = { name, phone, password };
+    const data: RegisterInput = { name, phone, password };
     if (email.trim() !== "") {
       data.email = email.trim();
     }
 
     try {
       await register(data);
-      setSuccess(true);
-      setTimeout(() => {
-        navigate("/login");
-      }, 3000);
+      navigate("/account", {
+        replace: true,
+        state: {
+          registrationComplete: true,
+          verificationEmailSent: Boolean(data.email),
+        },
+      });
     } catch (err) {
       if (err instanceof ApiException) {
         if (err.error.code === "VALIDATION_ERROR" && err.error.details) {
@@ -49,22 +52,6 @@ export const Register: React.FC = () => {
       setLoading(false);
     }
   };
-
-  if (success) {
-    return (
-      <div className="auth-container">
-        <div className="auth-card text-center" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{ color: '#157347', marginBottom: '1rem' }}>
-            <CheckCircle size={64} />
-          </div>
-          <h1 className="auth-title">Registration Successful!</h1>
-          <p className="auth-subtitle" style={{ marginBottom: 0 }}>
-            Welcome to DokanBD. Redirecting you to login...
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="auth-container">

@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from "react";
-import { User, authApi } from "../../api/auth";
+import { LoginInput, RegisterInput, User, authApi } from "../../api/auth";
 import { setAccessToken } from "../../api/client";
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (data: any) => Promise<void>;
-  register: (data: any) => Promise<void>;
+  login: (data: LoginInput) => Promise<void>;
+  register: (data: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -44,14 +44,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => window.removeEventListener("auth:session-expired", handleSessionExpired);
   }, []);
 
-  const login = async (data: any) => {
+  const login = async (data: LoginInput) => {
     const { accessToken, user } = await authApi.login(data);
     setAccessToken(accessToken);
     setUser(user);
   };
 
-  const register = async (data: any) => {
+  const register = async (data: RegisterInput) => {
     await authApi.register(data);
+    await login({ identifier: data.phone, password: data.password });
   };
 
   const logout = async () => {

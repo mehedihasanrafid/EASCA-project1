@@ -15,7 +15,28 @@ interface Props {
   loading?: boolean;
 }
 
-const AUTO_ADVANCE_MS = 4500;
+// HOW OFTEN THE NEXT CATEGORY STARTS MOVING.
+// Keep only one value uncommented, save the file, and test in the browser.
+//const AUTO_ADVANCE_MS = 1800; // Current: move every 1.8 seconds.
+// const AUTO_ADVANCE_MS = 1000; // Very fast: every 1 second.
+// const AUTO_ADVANCE_MS = 1500; // Fast: every 1.5 seconds.
+// const AUTO_ADVANCE_MS = 2000; // Balanced: every 2 seconds.
+ const AUTO_ADVANCE_MS = 3000; // Relaxed: every 3 seconds.
+ //const AUTO_ADVANCE_MS = 4500; // Original setting: every 4.5 seconds.
+
+// HOW LONG ONE SLIDE MOVEMENT TAKES.
+// Keep this lower than AUTO_ADVANCE_MS so one movement finishes before the next.
+const TRANSITION_DURATION_MS = 1000; // Current: slow, smooth 1-second movement.
+// const TRANSITION_DURATION_MS = 400; // Fast movement.
+//const TRANSITION_DURATION_MS = 700; // Medium movement.
+// const TRANSITION_DURATION_MS = 1200; // Slower movement.
+// const TRANSITION_DURATION_MS = 1500; // Very slow movement.
+
+function easeInOutCubic(progress: number) {
+  return progress < 0.5
+    ? 4 * progress * progress * progress
+    : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+}
 
 function productLabel(count: number) {
   return `${count} product${count === 1 ? "" : "s"}`;
@@ -25,6 +46,8 @@ export const CategoryNavigation: React.FC<Props> = ({ categories, loading = fals
   const trackRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Array<HTMLAnchorElement | null>>([]);
   const scrollFrameRef = useRef<number | null>(null);
+  const motionFrameRef = useRef<number | null>(null);
+  const programmaticScrollRef = useRef(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -36,10 +59,39 @@ export const CategoryNavigation: React.FC<Props> = ({ categories, loading = fals
       const card = cardRefs.current[nextIndex];
       const track = trackRef.current;
       if (card && track) {
-        track.scrollTo({
-          left: card.offsetLeft - track.offsetLeft,
-          behavior: smooth && !reducedMotion ? "smooth" : "auto",
-        });
+        if (motionFrameRef.current !== null) {
+          window.cancelAnimationFrame(motionFrameRef.current);
+          motionFrameRef.current = null;
+        }
+
+        const targetLeft = card.offsetLeft - track.offsetLeft;
+
+        if (!smooth || reducedMotion || TRANSITION_DURATION_MS <= 0) {
+          programmaticScrollRef.current = false;
+          track.scrollLeft = targetLeft;
+        } else {
+          const startLeft = track.scrollLeft;
+          const distance = targetLeft - startLeft;
+          const startTime = performance.now();
+          programmaticScrollRef.current = true;
+
+          const animate = (currentTime: number) => {
+            const progress = Math.min(
+              (currentTime - startTime) / TRANSITION_DURATION_MS,
+              1,
+            );
+            track.scrollLeft = startLeft + distance * easeInOutCubic(progress);
+
+            if (progress < 1) {
+              motionFrameRef.current = window.requestAnimationFrame(animate);
+            } else {
+              motionFrameRef.current = null;
+              programmaticScrollRef.current = false;
+            }
+          };
+
+          motionFrameRef.current = window.requestAnimationFrame(animate);
+        }
       }
       setActiveIndex(nextIndex);
     },
@@ -85,9 +137,14 @@ export const CategoryNavigation: React.FC<Props> = ({ categories, loading = fals
     if (scrollFrameRef.current !== null) {
       window.cancelAnimationFrame(scrollFrameRef.current);
     }
+    if (motionFrameRef.current !== null) {
+      window.cancelAnimationFrame(motionFrameRef.current);
+    }
+    programmaticScrollRef.current = false;
   }, []);
 
   const updateActiveCard = () => {
+    if (programmaticScrollRef.current) return;
     if (scrollFrameRef.current !== null) return;
     scrollFrameRef.current = window.requestAnimationFrame(() => {
       scrollFrameRef.current = null;
@@ -182,7 +239,7 @@ export const CategoryNavigation: React.FC<Props> = ({ categories, loading = fals
 
       <div
         ref={trackRef}
-        className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         tabIndex={0}
         aria-label="Product categories"
         onKeyDown={handleKeyDown}

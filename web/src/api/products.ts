@@ -65,12 +65,42 @@ export interface PaginatedProducts {
   };
 }
 
+export interface ProductSuggestion {
+  id: string;
+  name: string;
+  slug: string;
+  price: Money;
+  regularPrice: Money;
+  discountPrice: Money | null;
+  category: ProductTaxonomy;
+  brand: ProductTaxonomy | null;
+  inStock: boolean;
+  thumbnail: {
+    url: string;
+    altText: string | null;
+  } | null;
+}
+
+export type ProductSort = "newest" | "price_asc" | "price_desc" | "name_asc";
+
+export interface ProductListParams {
+  search?: string;
+  category?: string;
+  brand?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  inStock?: boolean;
+  sort?: ProductSort;
+  page?: number;
+  limit?: number;
+}
+
 export const productApi = {
-  getProducts: (params?: Record<string, string | number>) => {
+  getProducts: (params: ProductListParams = {}, signal?: AbortSignal) => {
     const query = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
+        if (value !== undefined && value !== null && value !== "") {
           query.append(key, String(value));
         }
       });
@@ -78,7 +108,15 @@ export const productApi = {
     const queryString = query.toString();
     const url = `/products${queryString ? `?${queryString}` : ""}`;
     
-    return apiClient<PaginatedProducts>(url, { method: "GET" });
+    return apiClient<PaginatedProducts>(url, { method: "GET", signal });
+  },
+
+  getSearchSuggestions: (search: string, limit = 8, signal?: AbortSignal) => {
+    const query = new URLSearchParams({ q: search.trim(), limit: String(limit) });
+    return apiClient<{ suggestions: ProductSuggestion[] }>(
+      `/products/search-suggestions?${query.toString()}`,
+      { method: "GET", signal },
+    ).then(({ suggestions }) => suggestions);
   },
 
   getProductBySlug: (slug: string) => {

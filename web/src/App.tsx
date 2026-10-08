@@ -1,12 +1,14 @@
 import React from 'react';
 import { AuthProvider } from './features/auth/AuthContext';
+import { CartProvider } from './features/cart/CartContext';
 import { AppRouter } from './routes/AppRouter';
-import './styles/global.css';
 
 function App() {
   return (
     <AuthProvider>
-      <AppRouter />
+      <CartProvider>
+        <AppRouter />
+      </CartProvider>
     </AuthProvider>
   );
 }

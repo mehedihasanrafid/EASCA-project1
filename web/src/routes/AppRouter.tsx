@@ -4,16 +4,40 @@ import { useAuth } from "../features/auth/AuthContext";
 import { MainLayout } from "../layouts/MainLayout";
 import { Login } from "../pages/auth/Login";
 import { Register } from "../pages/auth/Register";
+import { ForgotPassword } from "../pages/auth/ForgotPassword";
+import { ResetPassword } from "../pages/auth/ResetPassword";
+import { VerifyEmail } from "../pages/auth/VerifyEmail";
 import { CustomerDashboard } from "../pages/dashboard/CustomerDashboard";
 import { AdminDashboard } from "../pages/dashboard/AdminDashboard";
 import { Home } from "../pages/Home";
 import { ProductDetail } from "../pages/products/ProductDetail";
+import { SearchResultsPage } from "../pages/products/SearchResultsPage";
+import { CartPage } from "../pages/cart/CartPage";
+import { AddressesPage } from "../pages/account/AddressesPage";
+import { CheckoutPage } from "../pages/checkout/CheckoutPage";
+import { OrdersPage } from "../pages/orders/OrdersPage";
+import { OrderDetailPage } from "../pages/orders/OrderDetailPage";
+import { AdminOrdersPage } from "../pages/admin/AdminOrdersPage";
+import { AdminOrderDetailPage } from "../pages/admin/AdminOrderDetailPage";
+import { AdminCatalogSettingsPage } from "../pages/admin/AdminCatalogSettingsPage";
 
 const ProtectedRoute: React.FC = () => {
   const { user, loading } = useAuth();
 
   if (loading) return <div className="loading-screen">Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
+
+  return <Outlet />;
+};
+
+const AccountRoute: React.FC = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) return <div className="loading-screen">Loading...</div>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role.code === "ADMIN" || user.role.code === "OWNER") {
+    return <Navigate to="/admin" replace />;
+  }
 
   return <Outlet />;
 };
@@ -62,7 +86,11 @@ export const AppRouter: React.FC = () => {
         <Route element={<MainLayout />}>
           {/* Public Home Page accessible to everyone */}
           <Route path="/" element={<Home />} />
+          <Route path="/search" element={<SearchResultsPage />} />
           <Route path="/products/:slug" element={<ProductDetail />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           
           {/* Auth routes (Logged out only) */}
           <Route element={<PublicOnlyRoute />}>
@@ -70,15 +98,26 @@ export const AppRouter: React.FC = () => {
             <Route path="/register" element={<Register />} />
           </Route>
 
-          {/* Protected Customer Routes */}
-          <Route element={<ProtectedRoute />}>
+          {/* Customer account route; administrators return to their dashboard. */}
+          <Route element={<AccountRoute />}>
             <Route path="/account" element={<CustomerDashboard />} />
+            <Route path="/account/addresses" element={<AddressesPage />} />
+            <Route path="/cart" element={<CartPage />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/account/orders" element={<OrdersPage />} />
+            <Route path="/account/orders/:orderId" element={<OrderDetailPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute />}>
             <Route path="/forbidden" element={<Forbidden />} />
           </Route>
 
           {/* Protected Admin Routes */}
           <Route element={<RoleRoute roles={["ADMIN", "OWNER"]} />}>
             <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/orders" element={<AdminOrdersPage />} />
+            <Route path="/admin/orders/:orderId" element={<AdminOrderDetailPage />} />
+            <Route path="/admin/catalog" element={<AdminCatalogSettingsPage />} />
           </Route>
           
           <Route path="*" element={<Navigate to="/" replace />} />

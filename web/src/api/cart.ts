@@ -19,7 +19,14 @@ export interface CartItem {
     id: string;
     name: string;
     slug: string;
+    primaryImage: {
+      url: string;
+      thumbnailUrl: string | null;
+      altText: string | null;
+    } | null;
   };
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Cart {
@@ -32,12 +39,33 @@ export interface Cart {
     subtotal: string;
     currency: string;
   };
+  createdAt: string;
+  updatedAt: string;
 }
 
 export const cartApi = {
+  getCart: () =>
+    apiClient<{ cart: Cart }>("/cart", { method: "GET" }).then(({ cart }) => cart),
+
   addItem: (productVariantId: string, quantity: number) =>
     apiClient<{ cart: Cart }>("/cart/items", {
       method: "POST",
       body: JSON.stringify({ productVariantId, quantity }),
     }).then(({ cart }) => cart),
+
+  updateItem: (itemId: string, quantity: number) =>
+    apiClient<{ cart: Cart }>(`/cart/items/${encodeURIComponent(itemId)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ quantity }),
+    }).then(({ cart }) => cart),
+
+  removeItem: (itemId: string) =>
+    apiClient<{ cart: Cart }>(`/cart/items/${encodeURIComponent(itemId)}`, {
+      method: "DELETE",
+    }).then(({ cart }) => cart),
+
+  clearCart: () =>
+    apiClient<{ cart: Cart }>("/cart/items", { method: "DELETE" }).then(
+      ({ cart }) => cart,
+    ),
 };

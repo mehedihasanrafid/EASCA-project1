@@ -1,12 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   AlertCircle,
+  ClipboardList,
   CheckCircle,
   ExternalLink,
   ImagePlus,
   Package,
   Pencil,
   Plus,
+  Settings2,
   Star,
   Trash2,
   X,
@@ -18,8 +20,9 @@ import {
   adminProductApi,
   CategoryOption,
 } from "../../api/adminProducts";
+import { AdminBrand, AdminProductType, adminCatalogApi } from "../../api/adminCatalog";
 import { ApiException } from "../../api/client";
-import type { ProductMedia, ProductTaxonomy } from "../../api/products";
+import type { ProductMedia } from "../../api/products";
 import { useAuth } from "../../features/auth/AuthContext";
 
 interface ProductFormState {
@@ -63,13 +66,6 @@ const emptyForm: ProductFormState = {
 const flattenCategories = (items: CategoryOption[]): CategoryOption[] =>
   items.flatMap((item) => [item, ...flattenCategories(item.children)]);
 
-const uniqueTaxonomies = (items: Array<ProductTaxonomy | null>) =>
-  Array.from(
-    new Map(
-      items.filter((item): item is ProductTaxonomy => item !== null).map((item) => [item.id, item]),
-    ).values(),
-  ).sort((left, right) => left.name.localeCompare(right.name));
-
 const priceFormatter = new Intl.NumberFormat("en-BD", {
   style: "currency",
   currency: "BDT",
@@ -80,6 +76,8 @@ export const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [brands, setBrands] = useState<AdminBrand[]>([]);
+  const [productTypes, setProductTypes] = useState<AdminProductType[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -98,12 +96,16 @@ export const AdminDashboard: React.FC = () => {
     setError("");
 
     try {
-      const [productResult, categoryResult] = await Promise.all([
+      const [productResult, categoryResult, brandResult, productTypeResult] = await Promise.all([
         adminProductApi.getProducts(),
         adminProductApi.getCategories(),
+        adminCatalogApi.getBrands(false),
+        adminCatalogApi.getProductTypes(false),
       ]);
       setProducts(productResult.products);
       setCategories(flattenCategories(categoryResult));
+      setBrands(brandResult.filter((brand) => brand.isActive && !brand.deletedAt));
+      setProductTypes(productTypeResult.filter((type) => type.isActive && !type.deletedAt));
     } catch (requestError) {
       setError(
         requestError instanceof ApiException
@@ -118,15 +120,6 @@ export const AdminDashboard: React.FC = () => {
   useEffect(() => {
     loadCatalog();
   }, [loadCatalog]);
-
-  const productTypes = useMemo(
-    () => uniqueTaxonomies(products.map((product) => product.productType)),
-    [products],
-  );
-  const brands = useMemo(
-    () => uniqueTaxonomies(products.map((product) => product.brand)),
-    [products],
-  );
 
   useEffect(() => {
     setForm((current) => ({
@@ -449,14 +442,14 @@ export const AdminDashboard: React.FC = () => {
           <h1>Products</h1>
           <p>Welcome, {user?.name}. Manage the DokanBD catalog and stock.</p>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={openCreateForm}
-        >
-          {showForm && !editingProductId ? <X size={18} /> : <Plus size={18} />}
-          {showForm && !editingProductId ? "Close" : "Add product"}
-        </button>
+        <div className="admin-header-actions">
+          <Link to="/admin/orders" className="btn btn-ghost"><ClipboardList size={18} />Manage orders</Link>
+          <Link to="/admin/catalog" className="btn btn-ghost"><Settings2 size={18} />Catalog settings</Link>
+          <button type="button" className="btn btn-primary" onClick={openCreateForm}>
+            {showForm && !editingProductId ? <X size={18} /> : <Plus size={18} />}
+            {showForm && !editingProductId ? "Close" : "Add product"}
+          </button>
+        </div>
       </div>
 
       {error && <div className="alert alert-error"><AlertCircle size={18} />{error}</div>}

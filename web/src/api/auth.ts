@@ -20,14 +20,26 @@ export interface AuthResult {
   accessToken: string;
 }
 
+export interface LoginInput {
+  identifier: string;
+  password: string;
+}
+
+export interface RegisterInput {
+  name: string;
+  phone: string;
+  email?: string;
+  password: string;
+}
+
 export const authApi = {
-  login: (data: Record<string, any>) => 
+  login: (data: LoginInput) =>
     apiClient<AuthResult>("/auth/login", { 
       method: "POST", 
       body: JSON.stringify(data) 
     }),
     
-  register: (data: Record<string, any>) => 
+  register: (data: RegisterInput) =>
     apiClient<{ user: User; developmentVerificationToken?: string }>("/auth/register", { 
       method: "POST", 
       body: JSON.stringify(data) 
@@ -51,5 +63,29 @@ export const authApi = {
   me: () => 
     apiClient<{ user: User }>("/auth/me", { 
       method: "GET" 
+    }),
+
+  verifyEmail: (token: string) =>
+    apiClient<void>("/auth/verify-email", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    }),
+
+  resendVerification: (email: string) =>
+    apiClient<void>("/auth/resend-verification", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
+  forgotPassword: (email: string) =>
+    apiClient<void>("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
+  resetPassword: (token: string, password: string) =>
+    apiClient<void>("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, password }),
     }),
 };

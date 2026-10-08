@@ -17,7 +17,34 @@ describe("productApi", () => {
     apiClient.mockResolvedValue(response);
 
     await expect(productApi.getProducts({ limit: 12, sort: "newest" })).resolves.toBe(response);
-    expect(apiClient).toHaveBeenCalledWith("/products?limit=12&sort=newest", { method: "GET" });
+    expect(apiClient).toHaveBeenCalledWith("/products?limit=12&sort=newest", {
+      method: "GET",
+      signal: undefined,
+    });
+  });
+
+  it("serializes complete public catalog filters", async () => {
+    apiClient.mockResolvedValue({
+      products: [],
+      pagination: { page: 2, limit: 12, total: 0, totalPages: 0 },
+    });
+
+    await productApi.getProducts({
+      search: "watch",
+      category: "accessories",
+      brand: "dokanbd",
+      minPrice: 500,
+      maxPrice: 3000,
+      inStock: true,
+      sort: "price_asc",
+      page: 2,
+      limit: 12,
+    });
+
+    expect(apiClient).toHaveBeenCalledWith(
+      "/products?search=watch&category=accessories&brand=dokanbd&minPrice=500&maxPrice=3000&inStock=true&sort=price_asc&page=2&limit=12",
+      { method: "GET", signal: undefined },
+    );
   });
 
   it("unwraps the product detail envelope", async () => {
@@ -26,5 +53,16 @@ describe("productApi", () => {
 
     await expect(productApi.getProductBySlug("shirt")).resolves.toBe(product);
     expect(apiClient).toHaveBeenCalledWith("/products/shirt", { method: "GET" });
+  });
+
+  it("loads trimmed, limited product search suggestions", async () => {
+    const suggestions = [{ id: "1", slug: "shirt", name: "Shirt" }];
+    apiClient.mockResolvedValue({ suggestions });
+
+    await expect(productApi.getSearchSuggestions("  shi  ", 6)).resolves.toBe(suggestions);
+    expect(apiClient).toHaveBeenCalledWith(
+      "/products/search-suggestions?q=shi&limit=6",
+      { method: "GET", signal: undefined },
+    );
   });
 });

@@ -18,8 +18,15 @@ export const publicProductListQuerySchema = z
   .object({
     search: z.string().trim().min(1).max(100).optional(),
     category: z.string().trim().min(1).max(120).optional(),
+    brand: z.string().trim().min(1).max(120).optional(),
     minPrice: moneySchema.optional(),
     maxPrice: moneySchema.optional(),
+    inStock: z
+      .enum(["true", "false"])
+      .optional()
+      .transform((value) =>
+        value === undefined ? undefined : value === "true",
+      ),
     sort: z
       .enum(["newest", "price_asc", "price_desc", "name_asc"])
       .default("newest"),

@@ -186,6 +186,41 @@ function applyCategoryFilter(
   }
 }
 
+function applyBrandFilter(
+  query: SelectQueryBuilder<Product>,
+  brand: string | undefined,
+) {
+  if (!brand) return;
+
+  if (/^[1-9]\d*$/.test(brand)) {
+    query.andWhere("brand.id = :brandId", { brandId: brand });
+  } else {
+    query.andWhere("LOWER(brand.slug) = :brandSlug", {
+      brandSlug: brand.toLowerCase(),
+    });
+  }
+}
+
+function applyStockFilter(
+  query: SelectQueryBuilder<Product>,
+  inStock: boolean | undefined,
+) {
+  if (inStock === undefined) return;
+
+  const availableVariantExists = `EXISTS (
+    SELECT 1
+    FROM product_variants stock_variant
+    WHERE stock_variant.product_id = product.id
+      AND stock_variant.is_active = true
+      AND stock_variant.deleted_at IS NULL
+      AND stock_variant.stock_quantity > 0
+  )`;
+
+  query.andWhere(
+    inStock ? availableVariantExists : `NOT ${availableVariantExists}`,
+  );
+}
+
 function applySearchFilter(
   query: SelectQueryBuilder<Product>,
   search: string | undefined,
@@ -204,23 +239,23 @@ function applyPublicSearchFilter(
 ) {
   if (!search) return;
 
-  query
-    .leftJoin(
-      ProductVariant,
-      "searchVariant",
-      "searchVariant.productId = product.id AND searchVariant.isActive = :active AND searchVariant.deletedAt IS NULL",
-    )
-    .andWhere(
-      `(
-        LOWER(product.name) LIKE :search
-        OR LOWER(product.slug) LIKE :search
-        OR LOWER(category.name) LIKE :search
-        OR LOWER(COALESCE(brand.name, '')) LIKE :search
-        OR LOWER(searchVariant.sku) LIKE :search
-      )`,
-      { search: `%${search.toLowerCase()}%` },
-    )
-    .distinct(true);
+  query.andWhere(
+    `(
+      LOWER(product.name) LIKE :search
+      OR LOWER(product.slug) LIKE :search
+      OR LOWER(category.name) LIKE :search
+      OR LOWER(COALESCE(brand.name, '')) LIKE :search
+      OR EXISTS (
+        SELECT 1
+        FROM product_variants search_variant
+        WHERE search_variant.product_id = product.id
+          AND search_variant.is_active = true
+          AND search_variant.deleted_at IS NULL
+          AND LOWER(search_variant.sku) LIKE :search
+      )
+    )`,
+    { search: `%${search.toLowerCase()}%` },
+  );
 }
 
 async function loadProductsByIds(ids: string[], includeDeleted: boolean) {
@@ -429,6 +464,8 @@ export async function listPublicProducts(input: PublicProductListQuery) {
 
   applyPublicSearchFilter(query, input.search);
   applyCategoryFilter(query, input.category);
+  applyBrandFilter(query, input.brand);
+  applyStockFilter(query, input.inStock);
 
   if (input.minPrice !== undefined) {
     query.andWhere(`${effectivePrice} >= :minPrice`, { minPrice: input.minPrice });

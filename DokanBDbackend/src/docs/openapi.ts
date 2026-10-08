@@ -263,6 +263,16 @@ const endpointDefinitions: EndpointDefinition[] = [
     path: "/categories",
     tag: "Categories",
     summary: "List the public category tree",
+    description:
+      "Returns active categories with direct and descendant product counts. displayImageUrl uses the category image first, then an active product image, then a descendant category image.",
+    responseSchema: "CategoryListResponse",
+  },
+  {
+    method: "get",
+    path: "/brands",
+    tag: "Brands",
+    summary: "List active public brands",
+    responseSchema: "BrandListResponse",
   },
   {
     method: "get",
@@ -328,8 +338,14 @@ const endpointDefinitions: EndpointDefinition[] = [
       ...paginationParameters,
       queryParameter("search", { type: "string", maxLength: 100 }),
       queryParameter("category", { type: "string" }, "Category slug"),
+      queryParameter("brand", { type: "string" }, "Brand ID or slug"),
       queryParameter("minPrice", { type: "number", minimum: 0 }),
       queryParameter("maxPrice", { type: "number", minimum: 0 }),
+      queryParameter(
+        "inStock",
+        { type: "boolean" },
+        "When true, return products with available active variant stock; when false, return products without available stock.",
+      ),
       queryParameter("sort", {
         type: "string",
         enum: ["newest", "price_asc", "price_desc", "name_asc"],
@@ -905,6 +921,7 @@ export const openApiDocument = {
     { name: "Admin users" },
     { name: "Addresses" },
     { name: "Categories" },
+    { name: "Brands" },
     { name: "Admin categories" },
     { name: "Products" },
     { name: "Admin products" },
@@ -1063,6 +1080,57 @@ export const openApiDocument = {
           },
         },
       },
+      PublicCategory: {
+        type: "object",
+        required: [
+          "id",
+          "parentId",
+          "name",
+          "slug",
+          "description",
+          "imageUrl",
+          "displayImageUrl",
+          "productCount",
+          "sortOrder",
+          "children",
+        ],
+        properties: {
+          id: { type: "string", example: "2" },
+          parentId: { type: "string", nullable: true, example: null },
+          name: { type: "string", example: "Accessories" },
+          slug: { type: "string", example: "accessories" },
+          description: { type: "string", nullable: true },
+          imageUrl: { type: "string", nullable: true },
+          displayImageUrl: {
+            type: "string",
+            nullable: true,
+            example: "/uploads/products/sunglasses.webp",
+          },
+          productCount: { type: "integer", minimum: 0, example: 3 },
+          sortOrder: { type: "integer", minimum: 0 },
+          children: {
+            type: "array",
+            items: schemaRef("PublicCategory"),
+          },
+        },
+      },
+      CategoryListResponse: {
+        type: "object",
+        required: ["success", "data"],
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            required: ["categories"],
+            properties: {
+              categories: {
+                type: "array",
+                items: schemaRef("PublicCategory"),
+              },
+            },
+          },
+        },
+      },
       CategoryRequest: {
         type: "object",
         required: ["name"],
@@ -1072,6 +1140,34 @@ export const openApiDocument = {
         type: "object",
         minProperties: 1,
         properties: categoryProperties,
+      },
+      Brand: {
+        type: "object",
+        required: ["id", "name", "slug", "logoUrl"],
+        properties: {
+          id: { type: "string", example: "1" },
+          name: { type: "string", example: "DokanBD" },
+          slug: { type: "string", example: "dokanbd" },
+          logoUrl: {
+            type: "string",
+            nullable: true,
+            example: "https://example.com/brands/dokanbd.svg",
+          },
+        },
+      },
+      BrandListResponse: {
+        type: "object",
+        required: ["success", "data"],
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            required: ["brands"],
+            properties: {
+              brands: { type: "array", items: schemaRef("Brand") },
+            },
+          },
+        },
       },
       ProductRequest: {
         type: "object",

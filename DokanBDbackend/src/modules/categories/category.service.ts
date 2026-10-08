@@ -1,5 +1,7 @@
 import { AppDataSource } from "../../database/data-source.js";
 import { AppError } from "../../utils/app-error.js";
+import { ProductMedia } from "../products/product-media.entity.js";
+import { Product } from "../products/product.entity.js";
 import { Category } from "./category.entity.js";
 import type {
   CreateCategoryInput,
@@ -13,12 +15,83 @@ export interface CategoryTreeItem {
   slug: string;
   description: string | null;
   imageUrl: string | null;
+  displayImageUrl: string | null;
+  productCount: number;
   sortOrder: number;
   children: CategoryTreeItem[];
 }
 
+interface CategoryProductSummary {
+  categoryId: string;
+  displayImageUrl: string | null;
+  productCount: number;
+}
+
 function categoryRepository() {
   return AppDataSource.getRepository(Category);
+}
+
+async function getCategoryProductSummaries(categoryIds: string[]) {
+  if (categoryIds.length === 0) return new Map<string, CategoryProductSummary>();
+
+  const rows = await AppDataSource.getRepository(Product)
+    .createQueryBuilder("product")
+    .leftJoin(
+      ProductMedia,
+      "categoryMedia",
+      "categoryMedia.productId = product.id AND categoryMedia.mediaType = :mediaType",
+      { mediaType: "IMAGE" },
+    )
+    .select("product.categoryId", "categoryId")
+    .addSelect("COUNT(DISTINCT product.id)", "productCount")
+    .addSelect(
+      `SUBSTRING_INDEX(
+        GROUP_CONCAT(
+          COALESCE(categoryMedia.thumbnailUrl, categoryMedia.url)
+          ORDER BY
+            product.isFeatured DESC,
+            product.createdAt DESC,
+            categoryMedia.isPrimary DESC,
+            categoryMedia.sortOrder ASC,
+            categoryMedia.id ASC
+          SEPARATOR '||'
+        ),
+        '||',
+        1
+      )`,
+      "displayImageUrl",
+    )
+    .where("product.categoryId IN (:...categoryIds)", { categoryIds })
+    .andWhere("product.status = :status", { status: "ACTIVE" })
+    .andWhere("product.isActive = :active", { active: true })
+    .groupBy("product.categoryId")
+    .getRawMany<{
+      categoryId: string | number;
+      displayImageUrl: string | null;
+      productCount: string | number;
+    }>();
+
+  return new Map(
+    rows.map((row) => [
+      String(row.categoryId),
+      {
+        categoryId: String(row.categoryId),
+        displayImageUrl: row.displayImageUrl,
+        productCount: Number(row.productCount),
+      },
+    ]),
+  );
+}
+
+function includeDescendantSummary(item: CategoryTreeItem): CategoryTreeItem {
+  item.children = item.children.map(includeDescendantSummary);
+  item.productCount += item.children.reduce(
+    (total, child) => total + child.productCount,
+    0,
+  );
+  item.displayImageUrl ??=
+    item.children.find((child) => child.displayImageUrl)?.displayImageUrl ?? null;
+  return item;
 }
 
 function createSlug(value: string) {
@@ -126,10 +199,14 @@ export async function listPublicCategoryTree() {
     where: { isActive: true },
     order: { sortOrder: "ASC", name: "ASC" },
   });
+  const productSummaries = await getCategoryProductSummaries(
+    categories.map(({ id }) => id),
+  );
 
   const byId = new Map<string, CategoryTreeItem>();
 
   for (const category of categories) {
+    const productSummary = productSummaries.get(category.id);
     byId.set(category.id, {
       id: category.id,
       parentId: category.parentId,
@@ -137,6 +214,8 @@ export async function listPublicCategoryTree() {
       slug: category.slug,
       description: category.description,
       imageUrl: category.imageUrl,
+      displayImageUrl: category.imageUrl ?? productSummary?.displayImageUrl ?? null,
+      productCount: productSummary?.productCount ?? 0,
       sortOrder: category.sortOrder,
       children: [],
     });
@@ -155,7 +234,7 @@ export async function listPublicCategoryTree() {
     byId.get(item.parentId)?.children.push(item);
   }
 
-  return roots;
+  return roots.map(includeDescendantSummary);
 }
 
 export async function listAdminCategories(includeDeleted: boolean) {

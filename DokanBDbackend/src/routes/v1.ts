@@ -7,6 +7,7 @@ import {
   adminCategoryRouter,
   categoryRouter,
 } from "../modules/categories/category.routes.js";
+import { brandRouter } from "../modules/brands/brand.routes.js";
 import { healthRouter } from "../modules/health/health.routes.js";
 import { adminOrderRouter } from "../modules/orders/order-admin.routes.js";
 import { orderRouter } from "../modules/orders/order.routes.js";
@@ -24,6 +25,7 @@ v1Router.use("/addresses", addressRouter);
 v1Router.use("/cart", cartRouter);
 v1Router.use("/users", userRouter);
 v1Router.use("/categories", categoryRouter);
+v1Router.use("/brands", brandRouter);
 v1Router.use("/products", productRouter);
 v1Router.use("/admin/categories", adminCategoryRouter);
 v1Router.use("/admin/products", adminProductRouter);

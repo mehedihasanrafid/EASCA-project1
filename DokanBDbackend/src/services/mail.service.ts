@@ -15,6 +15,16 @@ interface ActionEmailInput {
   actionUrl: string;
 }
 
+interface OrderEmailInput {
+  to: string;
+  recipientName: string;
+  orderNumber: string;
+  orderStatus: string;
+  grandTotal: string;
+  currency: string;
+  orderUrl: string;
+}
+
 let transporter: Transporter | null = null;
 
 function escapeHtml(value: string) {
@@ -115,6 +125,61 @@ export function sendPasswordResetEmail({
       "<p>We received a request to reset your DokanBD password.</p>",
       `<p><a href="${safeUrl}">Reset password</a></p>`,
       "<p>If you did not request this, you can ignore this email.</p>",
+    ].join(""),
+  });
+}
+
+export function sendOrderPlacedEmail({
+  to,
+  recipientName,
+  orderNumber,
+  grandTotal,
+  currency,
+  orderUrl,
+}: OrderEmailInput) {
+  const safeName = escapeHtml(recipientName);
+  const safeOrderNumber = escapeHtml(orderNumber);
+  const safeTotal = escapeHtml(`${currency} ${grandTotal}`);
+  const safeUrl = escapeHtml(orderUrl);
+
+  return sendMail({
+    to,
+    subject: `DokanBD order received: ${orderNumber}`,
+    text: `Hello ${recipientName}, we received order ${orderNumber}. Cash on delivery total: ${currency} ${grandTotal}. Track it here: ${orderUrl}`,
+    html: [
+      `<p>Hello ${safeName},</p>`,
+      `<p>We received your DokanBD order <strong>${safeOrderNumber}</strong>.</p>`,
+      `<p>Cash on delivery total: <strong>${safeTotal}</strong></p>`,
+      `<p><a href="${safeUrl}">View your order</a></p>`,
+      "<p>We will email you again when the order status changes.</p>",
+    ].join(""),
+  });
+}
+
+export function sendOrderStatusEmail({
+  to,
+  recipientName,
+  orderNumber,
+  orderStatus,
+  grandTotal,
+  currency,
+  orderUrl,
+}: OrderEmailInput) {
+  const safeName = escapeHtml(recipientName);
+  const safeOrderNumber = escapeHtml(orderNumber);
+  const safeStatus = escapeHtml(orderStatus);
+  const safeTotal = escapeHtml(`${currency} ${grandTotal}`);
+  const safeUrl = escapeHtml(orderUrl);
+
+  return sendMail({
+    to,
+    subject: `DokanBD order ${orderNumber}: ${orderStatus}`,
+    text: `Hello ${recipientName}, order ${orderNumber} is now ${orderStatus}. Total: ${currency} ${grandTotal}. View it here: ${orderUrl}`,
+    html: [
+      `<p>Hello ${safeName},</p>`,
+      `<p>Your DokanBD order <strong>${safeOrderNumber}</strong> is now <strong>${safeStatus}</strong>.</p>`,
+      `<p>Order total: <strong>${safeTotal}</strong></p>`,
+      `<p><a href="${safeUrl}">View order details</a></p>`,
     ].join(""),
   });
 }

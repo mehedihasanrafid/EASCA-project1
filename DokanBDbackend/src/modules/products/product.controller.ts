@@ -5,6 +5,7 @@ import {
   adminProductListQuerySchema,
   createProductSchema,
   createProductVariantSchema,
+  createProductVariantsBulkSchema,
   productIdentifierParamsSchema,
   productIdForVariantParamsSchema,
   productIdParamsSchema,
@@ -17,6 +18,7 @@ import {
 import {
   createProduct,
   createProductVariant,
+  createProductVariantsBulk,
   deleteProduct,
   deleteProductVariant,
   getAdminProduct,
@@ -139,6 +141,20 @@ export const createVariantForAdmin: RequestHandler = async (
   );
 
   response.status(201).json({ success: true, data: { variant } });
+};
+
+export const createVariantsBulkForAdmin: RequestHandler = async (
+  request,
+  response,
+) => {
+  const { productId } = productIdForVariantParamsSchema.parse(request.params);
+  const input = createProductVariantsBulkSchema.parse(request.body);
+  const variants = await createProductVariantsBulk(
+    productId,
+    input,
+    authenticatedUserId(request),
+  );
+  response.status(201).json({ success: true, data: { variants } });
 };
 
 export const updateVariantForAdmin: RequestHandler = async (

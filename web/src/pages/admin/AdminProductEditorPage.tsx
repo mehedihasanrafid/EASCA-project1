@@ -1,19 +1,14 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
   AlertCircle,
-  ClipboardList,
+  ArrowLeft,
   CheckCircle,
-  ExternalLink,
   ImagePlus,
-  Package,
-  Pencil,
-  Plus,
-  Settings2,
   Star,
   Trash2,
   X,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 import {
   AdminProduct,
@@ -23,7 +18,7 @@ import {
 import { AdminBrand, AdminProductType, adminCatalogApi } from "../../api/adminCatalog";
 import { ApiException } from "../../api/client";
 import type { ProductMedia } from "../../api/products";
-import { useAuth } from "../../features/auth/AuthContext";
+import { AdminVariantBuilder, VariantDraft } from "../dashboard/AdminVariantBuilder";
 
 interface ProductFormState {
   name: string;
@@ -35,11 +30,6 @@ interface ProductFormState {
   defaultPrice: string;
   discountPrice: string;
   costPrice: string;
-  sku: string;
-  variantName: string;
-  color: string;
-  size: string;
-  stockQuantity: string;
   status: AdminProduct["status"];
   isFeatured: boolean;
 }
@@ -54,11 +44,6 @@ const emptyForm: ProductFormState = {
   defaultPrice: "",
   discountPrice: "",
   costPrice: "",
-  sku: "",
-  variantName: "Default",
-  color: "",
-  size: "",
-  stockQuantity: "0",
   status: "ACTIVE",
   isFeatured: false,
 };
@@ -66,24 +51,29 @@ const emptyForm: ProductFormState = {
 const flattenCategories = (items: CategoryOption[]): CategoryOption[] =>
   items.flatMap((item) => [item, ...flattenCategories(item.children)]);
 
-const priceFormatter = new Intl.NumberFormat("en-BD", {
-  style: "currency",
-  currency: "BDT",
-  minimumFractionDigits: 0,
+const emptySimpleVariant = (): VariantDraft => ({
+  key: `new-simple-${Date.now()}`,
+  optionValueIds: [],
+  optionLabel: "Default",
+  sku: "",
+  price: "",
+  costPrice: "",
+  stockQuantity: "0",
+  isDefault: true,
+  isActive: true,
 });
 
-export const AdminDashboard: React.FC = () => {
-  const { user } = useAuth();
-  const [products, setProducts] = useState<AdminProduct[]>([]);
+export const AdminProductEditorPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { productId } = useParams();
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [brands, setBrands] = useState<AdminBrand[]>([]);
   const [productTypes, setProductTypes] = useState<AdminProductType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
-  const [editingVariantId, setEditingVariantId] = useState<string | null>(null);
-  const [loadingEditorId, setLoadingEditorId] = useState<string | null>(null);
+  const [variantDrafts, setVariantDrafts] = useState<VariantDraft[]>([emptySimpleVariant()]);
+  const [originalVariantIds, setOriginalVariantIds] = useState<string[]>([]);
   const [media, setMedia] = useState<ProductMedia[]>([]);
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [mediaBusyId, setMediaBusyId] = useState<string | null>(null);
@@ -96,13 +86,11 @@ export const AdminDashboard: React.FC = () => {
     setError("");
 
     try {
-      const [productResult, categoryResult, brandResult, productTypeResult] = await Promise.all([
-        adminProductApi.getProducts(),
+      const [categoryResult, brandResult, productTypeResult] = await Promise.all([
         adminProductApi.getCategories(),
         adminCatalogApi.getBrands(false),
         adminCatalogApi.getProductTypes(false),
       ]);
-      setProducts(productResult.products);
       setCategories(flattenCategories(categoryResult));
       setBrands(brandResult.filter((brand) => brand.isActive && !brand.deletedAt));
       setProductTypes(productTypeResult.filter((type) => type.isActive && !type.deletedAt));
@@ -138,66 +126,32 @@ export const AdminDashboard: React.FC = () => {
     setForm((current) => ({ ...current, [key]: value }));
   };
 
-  const setCategory = (categoryId: string) => {
-    const category = categories.find((item) => item.id === categoryId);
-    const matchingType = productTypes.find((type) => type.slug === category?.slug);
-    setForm((current) => ({
-      ...current,
-      categoryId,
-      ...(matchingType ? { productTypeId: matchingType.id } : {}),
-    }));
-  };
-
   const closeEditor = () => {
-    setShowForm(false);
-    setEditingProductId(null);
-    setEditingVariantId(null);
-    setMedia([]);
-    setPendingImages([]);
-    setForm({
-      ...emptyForm,
-      productTypeId: productTypes[0]?.id || "",
-      categoryId: categories[0]?.id || "",
-      brandId: brands[0]?.id || "",
-    });
-  };
-
-  const openCreateForm = () => {
-    if (showForm && !editingProductId) {
-      closeEditor();
-      return;
-    }
-
-    setEditingProductId(null);
-    setEditingVariantId(null);
-    setMedia([]);
-    setPendingImages([]);
-    setError("");
-    setSuccess("");
-    setForm({
-      ...emptyForm,
-      productTypeId:
-        productTypes.find((type) => type.slug === categories[0]?.slug)?.id ||
-        productTypes[0]?.id ||
-        "",
-      categoryId: categories[0]?.id || "",
-      brandId: brands[0]?.id || "",
-    });
-    setShowForm(true);
+    navigate("/admin/products");
   };
 
   const openEditForm = async (productId: string) => {
-    setLoadingEditorId(productId);
+    setLoading(true);
     setError("");
     setSuccess("");
 
     try {
       const product = await adminProductApi.getProduct(productId);
-      const variant =
-        product.variants?.find((item) => item.isDefault) ?? product.variants?.[0];
-
       setEditingProductId(product.id);
-      setEditingVariantId(variant?.id ?? null);
+      const loadedVariants: VariantDraft[] = (product.variants ?? []).map((variant) => ({
+        key: `existing-${variant.id}`,
+        id: variant.id,
+        optionValueIds: variant.optionValues?.map((value) => value.id) ?? [],
+        optionLabel: variant.optionValues?.map((value) => value.label).join(" / ") || variant.name || "Default",
+        sku: variant.sku,
+        price: String(variant.price),
+        costPrice: variant.costPrice == null ? "" : String(variant.costPrice),
+        stockQuantity: String(variant.stockQuantity),
+        isDefault: variant.isDefault,
+        isActive: variant.isActive ?? true,
+      }));
+      setVariantDrafts(loadedVariants.length ? loadedVariants : [emptySimpleVariant()]);
+      setOriginalVariantIds(loadedVariants.flatMap((variant) => variant.id ? [variant.id] : []));
       setMedia(product.media ?? []);
       setPendingImages([]);
       setForm({
@@ -210,15 +164,9 @@ export const AdminDashboard: React.FC = () => {
         defaultPrice: String(product.regularPrice),
         discountPrice: product.discountPrice === null ? "" : String(product.discountPrice),
         costPrice: product.defaultCostPrice === null ? "" : String(product.defaultCostPrice),
-        sku: variant?.sku ?? "",
-        variantName: variant?.name ?? "Default",
-        color: variant?.color ?? "",
-        size: variant?.size ?? "",
-        stockQuantity: String(variant?.stockQuantity ?? 0),
         status: product.status,
         isFeatured: product.isFeatured,
       });
-      setShowForm(true);
     } catch (requestError) {
       setError(
         requestError instanceof ApiException
@@ -226,9 +174,13 @@ export const AdminDashboard: React.FC = () => {
           : "Could not load this product for editing.",
       );
     } finally {
-      setLoadingEditorId(null);
+      setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (productId) void openEditForm(productId);
+  }, [productId]);
 
   const handleImageSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(event.target.files ?? []);
@@ -306,6 +258,19 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const assignMediaToVariant = async (mediaId: string, variantId: string) => {
+    if (!editingProductId) return;
+    setMediaBusyId(mediaId); setError("");
+    try {
+      const updated = await adminProductApi.updateMedia(editingProductId, mediaId, {
+        variantId: variantId || null,
+      });
+      setMedia((current) => current.map((item) => item.id === mediaId ? updated : item));
+    } catch (requestError) {
+      setError(requestError instanceof ApiException ? requestError.error.message : "Could not assign this media item.");
+    } finally { setMediaBusyId(null); }
+  };
+
   const handleSaveProduct = async (event: React.FormEvent) => {
     event.preventDefault();
     setError("");
@@ -314,12 +279,26 @@ export const AdminDashboard: React.FC = () => {
     const regularPrice = Number(form.defaultPrice);
     const discountPrice = form.discountPrice ? Number(form.discountPrice) : null;
     const costPrice = form.costPrice ? Number(form.costPrice) : null;
-    const stockQuantity = Number(form.stockQuantity);
 
     if (discountPrice !== null && discountPrice > regularPrice) {
       setError("The discount price cannot be higher than the regular price.");
       return;
     }
+    if (variantDrafts.length === 0 || variantDrafts.some((variant) => !variant.sku.trim())) {
+      setError("Add at least one variant and provide a unique SKU for every row.");
+      return;
+    }
+
+    const variantInputs = variantDrafts.map((variant) => ({
+      sku: variant.sku.trim(),
+      variantName: variant.optionLabel || "Default",
+      price: Number(variant.price || discountPrice || regularPrice),
+      costPrice: variant.costPrice ? Number(variant.costPrice) : costPrice,
+      stockQuantity: Number(variant.stockQuantity),
+      isDefault: variant.isDefault,
+      isActive: variant.isActive,
+      optionValueIds: variant.optionValueIds,
+    }));
 
     setSubmitting(true);
     let createdProduct: AdminProduct | null = null;
@@ -341,33 +320,24 @@ export const AdminDashboard: React.FC = () => {
           isActive: true,
         });
 
-        const variantInput = {
-          sku: form.sku.trim(),
-          variantName: form.variantName.trim() || undefined,
-          color: form.color.trim() || undefined,
-          size: form.size.trim() || undefined,
-          price: discountPrice ?? regularPrice,
-          costPrice,
-          stockQuantity,
-          isActive: true,
-        };
-
-        if (editingVariantId) {
-          await adminProductApi.updateVariant(editingProductId, editingVariantId, variantInput);
-        } else {
-          await adminProductApi.createVariant(editingProductId, {
-            ...variantInput,
-            isDefault: true,
-          });
+        const currentIds = new Set(variantDrafts.flatMap((variant) => variant.id ? [variant.id] : []));
+        for (const removedId of originalVariantIds.filter((id) => !currentIds.has(id))) {
+          await adminProductApi.deleteVariant(editingProductId, removedId);
         }
+        for (let index = 0; index < variantDrafts.length; index += 1) {
+          const draft = variantDrafts[index];
+          if (draft.id) await adminProductApi.updateVariant(editingProductId, draft.id, variantInputs[index]);
+        }
+        const newVariantInputs = variantInputs.filter((_, index) => !variantDrafts[index].id);
+        if (newVariantInputs.length) await adminProductApi.createVariantsBulk(editingProductId, newVariantInputs);
 
         if (pendingImages.length > 0) {
           await adminProductApi.uploadMedia(editingProductId, pendingImages, form.name);
         }
 
-        setSuccess(`${form.name} was updated successfully.`);
-        closeEditor();
-        await loadCatalog();
+        navigate("/admin/products", {
+          state: { success: `${form.name} was updated successfully.` },
+        });
         return;
       }
 
@@ -386,17 +356,7 @@ export const AdminDashboard: React.FC = () => {
         isActive: true,
       });
 
-      await adminProductApi.createVariant(createdProduct.id, {
-        sku: form.sku.trim(),
-        variantName: form.variantName.trim() || undefined,
-        color: form.color.trim() || undefined,
-        size: form.size.trim() || undefined,
-        price: discountPrice ?? regularPrice,
-        costPrice,
-        stockQuantity,
-        isDefault: true,
-        isActive: true,
-      });
+      await adminProductApi.createVariantsBulk(createdProduct.id, variantInputs);
 
       if (pendingImages.length > 0) {
         await adminProductApi.uploadMedia(createdProduct.id, pendingImages, form.name);
@@ -406,17 +366,9 @@ export const AdminDashboard: React.FC = () => {
         await adminProductApi.updateProduct(createdProduct.id, { status: form.status });
       }
 
-      setSuccess(`${form.name} was created successfully.`);
-      setForm({
-        ...emptyForm,
-        productTypeId: form.productTypeId,
-        categoryId: form.categoryId,
-        brandId: form.brandId,
+      navigate("/admin/products", {
+        state: { success: `${form.name} was created successfully.` },
       });
-      setShowForm(false);
-      setPendingImages([]);
-      setMedia([]);
-      await loadCatalog();
     } catch (requestError) {
       const message =
         requestError instanceof ApiException
@@ -429,34 +381,30 @@ export const AdminDashboard: React.FC = () => {
           ? `The product was saved as a draft, but setup did not finish: ${message}`
           : message,
       );
-      if (createdProduct) await loadCatalog();
     } finally {
       setSubmitting(false);
     }
   };
 
+  if (loading) {
+    return <div className="admin-page-loading">Loading product editor...</div>;
+  }
+
   return (
-    <div className="dashboard-container admin-catalog">
-      <div className="admin-catalog-header">
-        <div className="dashboard-header">
-          <h1>Products</h1>
-          <p>Welcome, {user?.name}. Manage the DokanBD catalog and stock.</p>
+    <div className="dashboard-container admin-catalog admin-page">
+      <header className="admin-page-header">
+        <div>
+          <Link className="product-back-link" to="/admin/products"><ArrowLeft size={17} /> Products</Link>
+          <p className="eyebrow">Catalog editor</p>
+          <h1>{editingProductId ? "Edit product" : "Add product"}</h1>
+          <p>Product type controls available properties; category and brand remain independent.</p>
         </div>
-        <div className="admin-header-actions">
-          <Link to="/admin/orders" className="btn btn-ghost"><ClipboardList size={18} />Manage orders</Link>
-          <Link to="/admin/catalog" className="btn btn-ghost"><Settings2 size={18} />Catalog settings</Link>
-          <button type="button" className="btn btn-primary" onClick={openCreateForm}>
-            {showForm && !editingProductId ? <X size={18} /> : <Plus size={18} />}
-            {showForm && !editingProductId ? "Close" : "Add product"}
-          </button>
-        </div>
-      </div>
+      </header>
 
       {error && <div className="alert alert-error"><AlertCircle size={18} />{error}</div>}
       {success && <div className="alert alert-success"><CheckCircle size={18} />{success}</div>}
 
-      {showForm && (
-        <form className="admin-product-form" onSubmit={handleSaveProduct}>
+      <form className="admin-product-form" onSubmit={handleSaveProduct}>
           <div className="admin-form-heading">
             <div>
               <h2>{editingProductId ? "Edit product" : "Add a product"}</h2>
@@ -471,7 +419,7 @@ export const AdminDashboard: React.FC = () => {
             </div>
             <div className="form-group">
               <label htmlFor="product-category">Category</label>
-              <select id="product-category" className="form-input" value={form.categoryId} onChange={(event) => setCategory(event.target.value)} required>
+              <select id="product-category" className="form-input" value={form.categoryId} onChange={(event) => setField("categoryId", event.target.value)} required>
                 <option value="">Choose category</option>
                 {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
               </select>
@@ -522,30 +470,19 @@ export const AdminDashboard: React.FC = () => {
               <label htmlFor="cost-price">Cost price</label>
               <input id="cost-price" className="form-input" type="number" min="0" step="0.01" value={form.costPrice} onChange={(event) => setField("costPrice", event.target.value)} />
             </div>
-            <div className="form-group">
-              <label htmlFor="stock">Initial stock</label>
-              <input id="stock" className="form-input" type="number" min="0" step="1" value={form.stockQuantity} onChange={(event) => setField("stockQuantity", event.target.value)} required />
-            </div>
-            <div className="form-group">
-              <label htmlFor="sku">SKU</label>
-              <input id="sku" className="form-input" value={form.sku} onChange={(event) => setField("sku", event.target.value.toUpperCase())} required maxLength={100} placeholder="e.g. DB-SHIRT-BLK-M" />
-            </div>
-            <div className="form-group">
-              <label htmlFor="variant-name">Option name</label>
-              <input id="variant-name" className="form-input" value={form.variantName} onChange={(event) => setField("variantName", event.target.value)} maxLength={150} placeholder="Default" />
-            </div>
-            <div className="form-group">
-              <label htmlFor="color">Color</label>
-              <input id="color" className="form-input" value={form.color} onChange={(event) => setField("color", event.target.value)} maxLength={100} />
-            </div>
-            <div className="form-group">
-              <label htmlFor="size">Size</label>
-              <input id="size" className="form-input" value={form.size} onChange={(event) => setField("size", event.target.value)} maxLength={100} />
-            </div>
             <label className="admin-checkbox admin-field-wide">
               <input type="checkbox" checked={form.isFeatured} onChange={(event) => setField("isFeatured", event.target.checked)} />
               Feature this product on the storefront
             </label>
+
+            <AdminVariantBuilder
+              productTypeId={form.productTypeId}
+              productName={form.name}
+              defaultPrice={form.discountPrice || form.defaultPrice}
+              defaultCostPrice={form.costPrice}
+              variants={variantDrafts}
+              onChange={setVariantDrafts}
+            />
 
             <div className="admin-form-divider admin-field-wide"><span>Product media</span></div>
 
@@ -563,6 +500,18 @@ export const AdminDashboard: React.FC = () => {
                         {item.isPrimary && <span className="admin-primary-badge"><Star size={13} /> Primary</span>}
                       </div>
                       <div className="admin-media-actions">
+                        {editingProductId && (
+                          <select
+                            className="form-input"
+                            aria-label={`Assign ${item.altText || "media"} to a variant`}
+                            value={item.variantId ?? ""}
+                            disabled={mediaBusyId === item.id}
+                            onChange={(event) => assignMediaToVariant(item.id, event.target.value)}
+                          >
+                            <option value="">All variants</option>
+                            {variantDrafts.filter((variant) => variant.id).map((variant) => <option key={variant.id} value={variant.id}>{variant.optionLabel || variant.sku}</option>)}
+                          </select>
+                        )}
                         {item.type === "IMAGE" && !item.isPrimary && (
                           <button type="button" onClick={() => setPrimaryImage(item.id)} disabled={mediaBusyId === item.id}>
                             <Star size={16} /> Set primary
@@ -598,7 +547,7 @@ export const AdminDashboard: React.FC = () => {
                   <input type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" multiple onChange={handleImageSelection} />
                 </label>
               ) : (
-                <p className="admin-media-limit">The four-image limit has been reached.</p>
+                <p className="admin-media-limit">The four-item media limit has been reached.</p>
               )}
 
               {pendingImages.length > 0 && (
@@ -617,81 +566,7 @@ export const AdminDashboard: React.FC = () => {
               {submitting ? "Saving product..." : editingProductId ? "Save changes" : "Create product"}
             </button>
           </div>
-        </form>
-      )}
-
-      <section className="admin-products-panel">
-        <div className="admin-panel-heading">
-          <div>
-            <h2>Catalog</h2>
-            <p>{products.length} product{products.length === 1 ? "" : "s"}</p>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="admin-empty-state">Loading products...</div>
-        ) : products.length === 0 ? (
-          <div className="admin-empty-state">
-            <Package size={36} />
-            <h3>No products yet</h3>
-            <p>Add the first product to start building the catalog.</p>
-          </div>
-        ) : (
-          <div className="admin-table-wrap">
-            <table className="admin-product-table">
-              <thead>
-                <tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr>
-              </thead>
-              <tbody>
-                {products.map((product) => (
-                  <tr key={product.id}>
-                    <td>
-                      <div className="admin-product-identity">
-                        <div className="admin-product-thumbnail" aria-hidden="true">
-                          {(product.primaryImage ?? product.media?.[0])?.type === "VIDEO" ? (
-                            <video src={(product.primaryImage ?? product.media?.[0])?.url} muted preload="metadata" />
-                          ) : product.primaryImage ?? product.media?.[0] ? (
-                            <img
-                              src={(product.primaryImage ?? product.media?.[0])?.thumbnailUrl || (product.primaryImage ?? product.media?.[0])?.url}
-                              alt=""
-                              loading="lazy"
-                            />
-                          ) : (
-                            <Package size={20} />
-                          )}
-                        </div>
-                        <div className="admin-product-copy">
-                          <strong>{product.name}</strong>
-                          <span className="admin-product-brand">{product.brand?.name || "Unbranded"}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td>{product.category.name}</td>
-                    <td>{priceFormatter.format(Number(product.price))}</td>
-                    <td><span className={product.stockQuantity > 0 ? "stock-in" : "stock-out"}>{product.stockQuantity}</span></td>
-                    <td><span className={`status-pill status-${product.status.toLowerCase()}`}>{product.status}</span></td>
-                    <td>
-                      <div className="admin-row-actions">
-                        <button
-                          type="button"
-                          className="admin-view-link"
-                          title={`Edit ${product.name}`}
-                          aria-label={`Edit ${product.name}`}
-                          disabled={loadingEditorId === product.id}
-                          onClick={() => openEditForm(product.id)}
-                        >
-                          <Pencil size={17} />
-                        </button>
-                        <Link to={`/products/${product.slug}`} className="admin-view-link" title="View storefront product" aria-label={`View ${product.name} on storefront`}><ExternalLink size={17} /></Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      </form>
     </div>
   );
 };

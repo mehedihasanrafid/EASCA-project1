@@ -14,8 +14,8 @@ describe("OpenAPI documentation", () => {
       0,
     );
 
-    expect(Object.keys(paths)).toHaveLength(50);
-    expect(operationCount).toBe(67);
+    expect(Object.keys(paths)).toHaveLength(59);
+    expect(operationCount).toBe(80);
   });
 
   it("marks protected and administrator operations with bearer security", () => {
@@ -38,6 +38,33 @@ describe("OpenAPI documentation", () => {
     const components = openApiDocument.components.schemas as Record<string, unknown>;
     expect(components.ProductMedia).toBeDefined();
     expect(components.ProductMediaListResponse).toBeDefined();
+  });
+
+  it("documents product properties, type assignments, and bulk variants", () => {
+    const components = openApiDocument.components.schemas as Record<string, unknown>;
+    expect(paths["/admin/attributes"]?.get).toBeDefined();
+    expect(paths["/admin/attributes/{id}/values"]?.post).toBeDefined();
+    expect(paths["/admin/product-types/{productTypeId}/attributes"]?.put).toBeDefined();
+    expect(paths["/admin/products/{productId}/variants/bulk"]?.post).toBeDefined();
+    expect(components.AdminAttribute).toBeDefined();
+    expect(components.BulkProductVariantRequest).toBeDefined();
+  });
+
+  it("documents the protected administrator dashboard analytics", () => {
+    const components = openApiDocument.components.schemas as Record<string, unknown>;
+
+    expect(paths["/admin/dashboard"]?.get?.security).toEqual([{ bearerAuth: [] }]);
+    expect(paths["/admin/dashboard"]?.get?.responses).toMatchObject({
+      "200": {
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/AdminDashboardResponse" },
+          },
+        },
+      },
+    });
+    expect(components.AdminDashboard).toBeDefined();
+    expect(components.AdminDashboardResponse).toBeDefined();
   });
 
   it("documents public product search suggestions", () => {

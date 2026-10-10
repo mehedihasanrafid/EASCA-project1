@@ -1,4 +1,4 @@
-import { In, type SelectQueryBuilder } from "typeorm";
+import { In, type EntityManager, type SelectQueryBuilder } from "typeorm";
 
 import { AppDataSource } from "../../database/data-source.js";
 import { AppError } from "../../utils/app-error.js";
@@ -6,6 +6,13 @@ import { Brand } from "../brands/brand.entity.js";
 import { Category } from "../categories/category.entity.js";
 import { InventoryMovement } from "../inventory/inventory-movement.entity.js";
 import { ProductType } from "../product-types/product-type.entity.js";
+import {
+  assertVariantCombinationAvailable,
+  loadVariantAttributeSelections,
+  replaceVariantAttributeValues,
+  validateVariantOptionValues,
+  type VariantAttributeSelection,
+} from "../attributes/product-attribute.service.js";
 import { Vendor } from "../vendors/vendor.entity.js";
 import { ProductMedia } from "./product-media.entity.js";
 import { ProductVariant } from "./product-variant.entity.js";
@@ -14,6 +21,7 @@ import type {
   AdminProductListQuery,
   CreateProductInput,
   CreateProductVariantInput,
+  CreateProductVariantsBulkInput,
   ProductSearchSuggestionsQuery,
   PublicProductListQuery,
   UpdateProductInput,
@@ -23,6 +31,7 @@ import type {
 interface CatalogAssociations {
   variantsByProduct: Map<string, ProductVariant[]>;
   mediaByProduct: Map<string, ProductMedia[]>;
+  attributeValuesByVariant: Map<string, VariantAttributeSelection[]>;
 }
 
 function productRepository() {
@@ -53,7 +62,10 @@ function money(value: number) {
   return value.toFixed(2);
 }
 
-function toPublicVariant(variant: ProductVariant) {
+function toPublicVariant(
+  variant: ProductVariant,
+  optionValues: VariantAttributeSelection[] = [],
+) {
   return {
     id: variant.id,
     sku: variant.sku,
@@ -66,12 +78,16 @@ function toPublicVariant(variant: ProductVariant) {
     inStock: variant.stockQuantity > 0,
     weight: variant.weight,
     isDefault: variant.isDefault,
+    optionValues,
   };
 }
 
-function toAdminVariant(variant: ProductVariant) {
+function toAdminVariant(
+  variant: ProductVariant,
+  optionValues: VariantAttributeSelection[] = [],
+) {
   return {
-    ...toPublicVariant(variant),
+    ...toPublicVariant(variant, optionValues),
     vendorId: variant.vendorId,
     costPrice: variant.costPrice,
     lowStockLevel: variant.lowStockLevel,
@@ -104,12 +120,31 @@ function toPublicProduct(
   variants: ProductVariant[],
   media: ProductMedia[],
   includeDetail: boolean,
+  attributeValuesByVariant: Map<string, VariantAttributeSelection[]> = new Map(),
 ) {
   const stockQuantity = totalStock(variants);
   const primaryMedia =
     media.find((item) => item.mediaType === "IMAGE" && item.isPrimary) ??
     media.find((item) => item.mediaType === "IMAGE") ??
     null;
+  const selectedValues = variants.flatMap(
+    (variant) => attributeValuesByVariant.get(variant.id) ?? [],
+  );
+  const optionGroups = new Map<
+    string,
+    { attribute: VariantAttributeSelection["attribute"]; values: Array<Omit<VariantAttributeSelection, "attribute">> }
+  >();
+  for (const value of selectedValues) {
+    const group = optionGroups.get(value.attribute.id) ?? {
+      attribute: value.attribute,
+      values: [],
+    };
+    if (!group.values.some((item) => item.id === value.id)) {
+      const { attribute: _attribute, ...publicValue } = value;
+      group.values.push(publicValue);
+    }
+    optionGroups.set(value.attribute.id, group);
+  }
 
   return {
     id: product.id,
@@ -144,7 +179,10 @@ function toPublicProduct(
     media: media.map(toPublicMedia),
     ...(includeDetail
       ? {
-          variants: variants.map(toPublicVariant),
+          variants: variants.map((variant) =>
+            toPublicVariant(variant, attributeValuesByVariant.get(variant.id) ?? []),
+          ),
+          options: [...optionGroups.values()],
         }
       : {}),
     createdAt: product.createdAt,
@@ -157,9 +195,10 @@ function toAdminProduct(
   variants: ProductVariant[],
   media: ProductMedia[],
   includeDetail: boolean,
+  attributeValuesByVariant: Map<string, VariantAttributeSelection[]> = new Map(),
 ) {
   return {
-    ...toPublicProduct(product, variants, media, includeDetail),
+    ...toPublicProduct(product, variants, media, includeDetail, attributeValuesByVariant),
     productTypeId: product.productTypeId,
     categoryId: product.categoryId,
     brandId: product.brandId,
@@ -167,7 +206,13 @@ function toAdminProduct(
     status: product.status,
     isActive: product.isActive,
     deletedAt: product.deletedAt,
-    ...(includeDetail ? { variants: variants.map(toAdminVariant) } : {}),
+    ...(includeDetail
+      ? {
+          variants: variants.map((variant) =>
+            toAdminVariant(variant, attributeValuesByVariant.get(variant.id) ?? []),
+          ),
+        }
+      : {}),
   };
 }
 
@@ -285,9 +330,10 @@ async function loadAssociations(
 ): Promise<CatalogAssociations> {
   const variantsByProduct = new Map<string, ProductVariant[]>();
   const mediaByProduct = new Map<string, ProductMedia[]>();
+  let attributeValuesByVariant = new Map<string, VariantAttributeSelection[]>();
 
   if (productIds.length === 0) {
-    return { variantsByProduct, mediaByProduct };
+    return { variantsByProduct, mediaByProduct, attributeValuesByVariant };
   }
 
   const variantQuery = AppDataSource.getRepository(ProductVariant)
@@ -311,6 +357,9 @@ async function loadAssociations(
       order: { sortOrder: "ASC", id: "ASC" },
     }),
   ]);
+  attributeValuesByVariant = await loadVariantAttributeSelections(
+    variants.map((variant) => variant.id),
+  );
 
   for (const variant of variants) {
     const group = variantsByProduct.get(variant.productId) ?? [];
@@ -324,7 +373,7 @@ async function loadAssociations(
     mediaByProduct.set(item.productId, group);
   }
 
-  return { variantsByProduct, mediaByProduct };
+  return { variantsByProduct, mediaByProduct, attributeValuesByVariant };
 }
 
 async function assertSlugAvailable(slug: string, ignoredId?: string) {
@@ -452,6 +501,77 @@ async function assertVariantIdentifiersAvailable(
   }
 }
 
+async function createVariantWithManager(
+  manager: EntityManager,
+  product: Product,
+  input: CreateProductVariantInput,
+  actorUserId: string,
+) {
+  const repository = manager.getRepository(ProductVariant);
+  const optionValueIds = input.optionValueIds ?? [];
+  const optionValues = await validateVariantOptionValues(
+    manager,
+    product.productTypeId,
+    optionValueIds,
+  );
+  await assertVariantCombinationAvailable(manager, product.id, optionValueIds);
+
+  const existingCount = await repository.countBy({ productId: product.id });
+  const shouldBeDefault = input.isDefault === true || existingCount === 0;
+  if (shouldBeDefault) {
+    await repository.update(
+      { productId: product.id, isDefault: true },
+      { isDefault: false },
+    );
+  }
+
+  const optionLabel = optionValues.map((value) => value.label).join(" / ");
+  const selectedColor = optionValues.find((value) => value.attribute.code === "color");
+  const selectedSize = optionValues.find((value) => value.attribute.code === "size");
+  const variant = repository.create({
+    productId: product.id,
+    vendorId: input.vendorId ?? null,
+    sku: input.sku,
+    barcode: input.barcode ?? null,
+    variantName: (input.variantName ?? optionLabel) || null,
+    color: input.color ?? selectedColor?.label ?? null,
+    size: input.size ?? selectedSize?.label ?? null,
+    price: money(input.price),
+    costPrice:
+      input.costPrice === undefined || input.costPrice === null
+        ? null
+        : money(input.costPrice),
+    stockQuantity: input.stockQuantity ?? 0,
+    lowStockLevel: input.lowStockLevel ?? 5,
+    weight:
+      input.weight === undefined || input.weight === null
+        ? null
+        : money(input.weight),
+    isDefault: shouldBeDefault,
+    isActive: input.isActive ?? true,
+  });
+  await repository.save(variant);
+  await replaceVariantAttributeValues(manager, variant.id, optionValueIds);
+
+  if (variant.stockQuantity > 0) {
+    await manager.getRepository(InventoryMovement).save(
+      manager.getRepository(InventoryMovement).create({
+        productVariantId: variant.id,
+        movementType: "INITIAL_STOCK",
+        quantity: variant.stockQuantity,
+        quantityBefore: 0,
+        quantityAfter: variant.stockQuantity,
+        referenceType: "PRODUCT_VARIANT",
+        referenceId: variant.id,
+        note: "Initial stock set when the variant was created.",
+        createdById: actorUserId,
+      }),
+    );
+  }
+
+  return toAdminVariant(variant, optionValues);
+}
+
 export async function listPublicProducts(input: PublicProductListQuery) {
   const effectivePrice = "COALESCE(product.discountPrice, product.defaultPrice)";
   const query = productRepository()
@@ -507,6 +627,7 @@ export async function listPublicProducts(input: PublicProductListQuery) {
         associations.variantsByProduct.get(product.id) ?? [],
         associations.mediaByProduct.get(product.id) ?? [],
         false,
+        associations.attributeValuesByVariant,
       ),
     ),
     pagination: {
@@ -561,6 +682,7 @@ export async function getProductSearchSuggestions(
       associations.variantsByProduct.get(product.id) ?? [],
       associations.mediaByProduct.get(product.id) ?? [],
       false,
+      associations.attributeValuesByVariant,
     );
 
     return {
@@ -616,6 +738,7 @@ export async function getPublicProduct(identifier: string) {
     associations.variantsByProduct.get(product.id) ?? [],
     associations.mediaByProduct.get(product.id) ?? [],
     true,
+    associations.attributeValuesByVariant,
   );
 }
 
@@ -652,6 +775,7 @@ export async function listAdminProducts(input: AdminProductListQuery) {
         associations.variantsByProduct.get(product.id) ?? [],
         associations.mediaByProduct.get(product.id) ?? [],
         false,
+        associations.attributeValuesByVariant,
       ),
     ),
     pagination: {
@@ -681,6 +805,7 @@ export async function getAdminProduct(productId: string) {
     associations.variantsByProduct.get(product.id) ?? [],
     associations.mediaByProduct.get(product.id) ?? [],
     true,
+    associations.attributeValuesByVariant,
   );
 }
 
@@ -836,60 +961,46 @@ export async function createProductVariant(
     assertVariantIdentifiersAvailable(input.sku, input.barcode),
   ]);
 
+  return AppDataSource.transaction((manager) =>
+    createVariantWithManager(manager, product, input, actorUserId),
+  );
+}
+
+export async function createProductVariantsBulk(
+  productId: string,
+  input: CreateProductVariantsBulkInput,
+  actorUserId: string,
+) {
+  const product = await productRepository().findOneBy({ id: productId });
+  if (!product) throw new AppError(404, "PRODUCT_NOT_FOUND", "Product not found.");
+
+  const skus = new Set<string>();
+  const barcodes = new Set<string>();
+  const combinations = new Set<string>();
+  for (const variant of input.variants) {
+    const sku = variant.sku.toLowerCase();
+    if (skus.has(sku)) throw new AppError(409, "PRODUCT_SKU_DUPLICATE", "Each generated variant must have a unique SKU.");
+    skus.add(sku);
+    if (variant.barcode) {
+      if (barcodes.has(variant.barcode)) throw new AppError(409, "PRODUCT_BARCODE_DUPLICATE", "Each generated variant must have a unique barcode.");
+      barcodes.add(variant.barcode);
+    }
+    const combination = [...(variant.optionValueIds ?? [])].sort().join(":");
+    if (combination && combinations.has(combination)) throw new AppError(409, "VARIANT_COMBINATION_DUPLICATE", "Generated variants contain the same option combination more than once.");
+    if (combination) combinations.add(combination);
+  }
+
+  await Promise.all(input.variants.flatMap((variant) => [
+    assertVendor(variant.vendorId),
+    assertVariantIdentifiersAvailable(variant.sku, variant.barcode),
+  ]));
+
   return AppDataSource.transaction(async (manager) => {
-    const repository = manager.getRepository(ProductVariant);
-    const existingCount = await repository.countBy({ productId });
-    const shouldBeDefault = input.isDefault === true || existingCount === 0;
-
-    if (shouldBeDefault) {
-      await repository.update(
-        { productId, isDefault: true },
-        { isDefault: false },
-      );
+    const created = [];
+    for (const variant of input.variants) {
+      created.push(await createVariantWithManager(manager, product, variant, actorUserId));
     }
-
-    const variant = repository.create({
-      productId,
-      vendorId: input.vendorId ?? null,
-      sku: input.sku,
-      barcode: input.barcode ?? null,
-      variantName: input.variantName ?? null,
-      color: input.color ?? null,
-      size: input.size ?? null,
-      price: money(input.price),
-      costPrice:
-        input.costPrice === undefined || input.costPrice === null
-          ? null
-          : money(input.costPrice),
-      stockQuantity: input.stockQuantity ?? 0,
-      lowStockLevel: input.lowStockLevel ?? 5,
-      weight:
-        input.weight === undefined || input.weight === null
-          ? null
-          : money(input.weight),
-      isDefault: shouldBeDefault,
-      isActive: input.isActive ?? true,
-    });
-
-    await repository.save(variant);
-
-    if (variant.stockQuantity > 0) {
-      await manager.getRepository(InventoryMovement).save(
-        manager.getRepository(InventoryMovement).create({
-          productVariantId: variant.id,
-          movementType: "INITIAL_STOCK",
-          quantity: variant.stockQuantity,
-          quantityBefore: 0,
-          quantityAfter: variant.stockQuantity,
-          referenceType: "PRODUCT_VARIANT",
-          referenceId: variant.id,
-          note: "Initial stock set when the variant was created.",
-          createdById: actorUserId,
-        }),
-      );
-    }
-
-    return toAdminVariant(variant);
+    return created;
   });
 }
 
@@ -913,6 +1024,23 @@ export async function updateProductVariant(
         404,
         "PRODUCT_VARIANT_NOT_FOUND",
         "Product variant not found.",
+      );
+    }
+
+    let optionValues = (await loadVariantAttributeSelections([variant.id], manager)).get(variant.id) ?? [];
+    if (input.optionValueIds !== undefined) {
+      const product = await manager.getRepository(Product).findOneBy({ id: productId });
+      if (!product) throw new AppError(404, "PRODUCT_NOT_FOUND", "Product not found.");
+      optionValues = await validateVariantOptionValues(
+        manager,
+        product.productTypeId,
+        input.optionValueIds,
+      );
+      await assertVariantCombinationAvailable(
+        manager,
+        productId,
+        input.optionValueIds,
+        variantId,
       );
     }
 
@@ -946,7 +1074,20 @@ export async function updateProductVariant(
     if (input.isDefault !== undefined) variant.isDefault = input.isDefault;
     if (input.isActive !== undefined) variant.isActive = input.isActive;
 
+    if (input.optionValueIds !== undefined) {
+      const selectedColor = optionValues.find((value) => value.attribute.code === "color");
+      const selectedSize = optionValues.find((value) => value.attribute.code === "size");
+      if (input.color === undefined) variant.color = selectedColor?.label ?? null;
+      if (input.size === undefined) variant.size = selectedSize?.label ?? null;
+      if (input.variantName === undefined) {
+        variant.variantName = optionValues.map((value) => value.label).join(" / ") || null;
+      }
+    }
+
     await repository.save(variant);
+    if (input.optionValueIds !== undefined) {
+      await replaceVariantAttributeValues(manager, variant.id, input.optionValueIds);
+    }
 
     if (
       input.stockQuantity !== undefined &&
@@ -967,7 +1108,7 @@ export async function updateProductVariant(
       );
     }
 
-    return toAdminVariant(variant);
+    return toAdminVariant(variant, optionValues);
   });
 }
 

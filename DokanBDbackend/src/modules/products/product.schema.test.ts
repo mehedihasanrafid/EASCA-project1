@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createProductVariantsBulkSchema,
   productSearchSuggestionsQuerySchema,
   publicProductListQuerySchema,
 } from "./product.schema.js";
@@ -55,5 +56,23 @@ describe("public product filter validation", () => {
     expect(() =>
       publicProductListQuerySchema.parse({ minPrice: "3000", maxPrice: "500" }),
     ).toThrow("minPrice cannot be greater than maxPrice");
+  });
+});
+
+describe("bulk product variant validation", () => {
+  it("accepts generated variants with normalized option value ids", () => {
+    const result = createProductVariantsBulkSchema.parse({
+      variants: [{
+        sku: "SHIRT-BLACK-M",
+        price: 1200,
+        stockQuantity: 5,
+        optionValueIds: ["1", "4"],
+      }],
+    });
+    expect(result.variants[0]?.optionValueIds).toEqual(["1", "4"]);
+  });
+
+  it("requires at least one variant", () => {
+    expect(() => createProductVariantsBulkSchema.parse({ variants: [] })).toThrow();
   });
 });

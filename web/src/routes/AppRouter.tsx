@@ -8,7 +8,6 @@ import { ForgotPassword } from "../pages/auth/ForgotPassword";
 import { ResetPassword } from "../pages/auth/ResetPassword";
 import { VerifyEmail } from "../pages/auth/VerifyEmail";
 import { CustomerDashboard } from "../pages/dashboard/CustomerDashboard";
-import { AdminDashboard } from "../pages/dashboard/AdminDashboard";
 import { Home } from "../pages/Home";
 import { ProductDetail } from "../pages/products/ProductDetail";
 import { SearchResultsPage } from "../pages/products/SearchResultsPage";
@@ -19,7 +18,14 @@ import { OrdersPage } from "../pages/orders/OrdersPage";
 import { OrderDetailPage } from "../pages/orders/OrderDetailPage";
 import { AdminOrdersPage } from "../pages/admin/AdminOrdersPage";
 import { AdminOrderDetailPage } from "../pages/admin/AdminOrderDetailPage";
-import { AdminCatalogSettingsPage } from "../pages/admin/AdminCatalogSettingsPage";
+import { AdminLayout } from "../layouts/AdminLayout";
+import { AdminBrandsPage } from "../pages/admin/AdminBrandsPage";
+import { AdminCategoriesPage } from "../pages/admin/AdminCategoriesPage";
+import { AdminOverviewPage } from "../pages/admin/AdminOverviewPage";
+import { AdminProductEditorPage } from "../pages/admin/AdminProductEditorPage";
+import { AdminProductsPage } from "../pages/admin/AdminProductsPage";
+import { AdminProductTypesPage } from "../pages/admin/AdminProductTypesPage";
+import { AdminPropertiesPage } from "../pages/admin/AdminPropertiesPage";
 
 const ProtectedRoute: React.FC = () => {
   const { user, loading } = useAuth();
@@ -114,10 +120,19 @@ export const AppRouter: React.FC = () => {
 
           {/* Protected Admin Routes */}
           <Route element={<RoleRoute roles={["ADMIN", "OWNER"]} />}>
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/orders" element={<AdminOrdersPage />} />
-            <Route path="/admin/orders/:orderId" element={<AdminOrderDetailPage />} />
-            <Route path="/admin/catalog" element={<AdminCatalogSettingsPage />} />
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<AdminOverviewPage />} />
+              <Route path="products" element={<AdminProductsPage />} />
+              <Route path="products/new" element={<AdminProductEditorPage />} />
+              <Route path="products/:productId/edit" element={<AdminProductEditorPage />} />
+              <Route path="orders" element={<AdminOrdersPage />} />
+              <Route path="orders/:orderId" element={<AdminOrderDetailPage />} />
+              <Route path="categories" element={<AdminCategoriesPage />} />
+              <Route path="brands" element={<AdminBrandsPage />} />
+              <Route path="product-types" element={<AdminProductTypesPage />} />
+              <Route path="properties" element={<AdminPropertiesPage />} />
+              <Route path="catalog" element={<Navigate to="/admin/categories" replace />} />
+            </Route>
           </Route>
           
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
-  ArrowLeft,
   CheckCircle,
   Eye,
   EyeOff,
@@ -12,7 +11,6 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { Link } from "react-router-dom";
 
 import {
   AdminBrand,
@@ -24,6 +22,12 @@ import {
   SaveProductTypeInput,
 } from "../../api/adminCatalog";
 import { ApiException } from "../../api/client";
+
+export type AdminCatalogSection = "categories" | "brands" | "product-types";
+
+interface AdminCatalogSettingsPageProps {
+  section: AdminCatalogSection;
+}
 
 interface CategoryFormState {
   name: string;
@@ -81,7 +85,25 @@ function requestMessage(error: unknown, fallback: string) {
   return error instanceof ApiException ? error.error.message : fallback;
 }
 
-export const AdminCatalogSettingsPage: React.FC = () => {
+const pageCopy: Record<AdminCatalogSection, { eyebrow: string; title: string; description: string }> = {
+  categories: {
+    eyebrow: "Catalog organization",
+    title: "Categories",
+    description: "Control where products appear and which categories are featured on the homepage.",
+  },
+  brands: {
+    eyebrow: "Catalog identity",
+    title: "Brands",
+    description: "Manage the reusable manufacturers that can be attached to products.",
+  },
+  "product-types": {
+    eyebrow: "Catalog structure",
+    title: "Product types",
+    description: "Define the product structures that receive reusable properties and variants.",
+  },
+};
+
+export const AdminCatalogSettingsPage: React.FC<AdminCatalogSettingsPageProps> = ({ section }) => {
   const [categories, setCategories] = useState<AdminCategory[]>([]);
   const [brands, setBrands] = useState<AdminBrand[]>([]);
   const [productTypes, setProductTypes] = useState<AdminProductType[]>([]);
@@ -98,15 +120,16 @@ export const AdminCatalogSettingsPage: React.FC = () => {
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(emptyCategoryForm);
   const [brandForm, setBrandForm] = useState<BrandFormState>(emptyBrandForm);
   const [productTypeForm, setProductTypeForm] = useState<ProductTypeFormState>(emptyProductTypeForm);
+  const copy = pageCopy[section];
 
   const loadReferences = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const [categoryResult, brandResult, productTypeResult] = await Promise.all([
-        adminCatalogApi.getCategories(true),
-        adminCatalogApi.getBrands(true),
-        adminCatalogApi.getProductTypes(true),
+        section === "categories" ? adminCatalogApi.getCategories(true) : Promise.resolve([]),
+        section === "brands" ? adminCatalogApi.getBrands(true) : Promise.resolve([]),
+        section === "product-types" ? adminCatalogApi.getProductTypes(true) : Promise.resolve([]),
       ]);
       setCategories(categoryResult);
       setBrands(brandResult);
@@ -116,7 +139,7 @@ export const AdminCatalogSettingsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [section]);
 
   useEffect(() => {
     loadReferences();
@@ -396,21 +419,20 @@ export const AdminCatalogSettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="dashboard-container admin-catalog admin-taxonomy-page">
-      <div className="admin-catalog-header">
-        <div className="dashboard-header">
-          <Link className="product-back-link" to="/admin"><ArrowLeft size={16} /> Products</Link>
-          <p className="eyebrow">Catalog settings</p>
-          <h1>Categories, brands &amp; product types</h1>
-          <p>Manage the reusable catalog information used by every product.</p>
+    <div className="dashboard-container admin-catalog admin-taxonomy-page admin-page">
+      <header className="admin-page-header">
+        <div>
+          <p className="eyebrow">{copy.eyebrow}</p>
+          <h1>{copy.title}</h1>
+          <p>{copy.description}</p>
         </div>
-      </div>
+      </header>
 
       {error && <div className="alert alert-error"><AlertCircle size={18} />{error}</div>}
       {success && <div className="alert alert-success"><CheckCircle size={18} />{success}</div>}
 
-      <div className="admin-taxonomy-grid">
-        <section className="admin-products-panel">
+      <div className="admin-taxonomy-grid is-single">
+        {section === "categories" && <section className="admin-products-panel">
           <div className="admin-panel-heading">
             <div>
               <h2>Categories</h2>
@@ -446,9 +468,9 @@ export const AdminCatalogSettingsPage: React.FC = () => {
           {loading ? <div className="admin-empty-state">Loading categories...</div> : (
             <div className="admin-table-wrap"><table className="admin-product-table admin-reference-table"><thead><tr><th>Category</th><th>Homepage</th><th>Order</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{categories.map((category) => <tr key={category.id} className={category.deletedAt ? "is-deleted" : ""}><td><strong>{category.name}</strong><span className="admin-product-brand">/{category.slug}{category.parentId ? ` · child of ${categories.find((item) => item.id === category.parentId)?.name ?? "category"}` : ""}</span></td><td>{category.showOnHomepage ? <span className="reference-visibility is-visible"><Eye size={15} /> Shown</span> : <span className="reference-visibility"><EyeOff size={15} /> Hidden</span>}</td><td>{category.sortOrder}</td><td><span className={`status-pill ${category.deletedAt || !category.isActive ? "status-inactive" : "status-active"}`}>{category.deletedAt ? "Deleted" : category.isActive ? "Active" : "Inactive"}</span></td><td><div className="admin-row-actions">{category.deletedAt ? <button type="button" className="admin-view-link" aria-label={`Restore ${category.name}`} title="Restore" disabled={busy} onClick={() => restoreCategory(category)}><RotateCcw size={17} /></button> : <><button type="button" className="admin-view-link" aria-label={`Edit ${category.name}`} title="Edit" onClick={() => editCategory(category)}><Pencil size={17} /></button><button type="button" className="admin-view-link reference-delete-button" aria-label={`Delete ${category.name}`} title="Delete" disabled={busy} onClick={() => removeCategory(category)}><Trash2 size={17} /></button></>}</div></td></tr>)}</tbody></table></div>
           )}
-        </section>
+        </section>}
 
-        <section className="admin-products-panel">
+        {section === "brands" && <section className="admin-products-panel">
           <div className="admin-panel-heading">
             <div><h2>Brands</h2><p>Brands become available in the product editor.</p></div>
             <button type="button" className="btn btn-primary" onClick={startNewBrand}><Plus size={17} /> Add brand</button>
@@ -471,9 +493,9 @@ export const AdminCatalogSettingsPage: React.FC = () => {
           {loading ? <div className="admin-empty-state">Loading brands...</div> : brands.length === 0 ? <div className="admin-empty-state"><Tags size={34} /><h3>No brands yet</h3><p>Create the first reusable brand.</p></div> : (
             <div className="admin-table-wrap"><table className="admin-product-table admin-reference-table"><thead><tr><th>Brand</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{brands.map((brand) => <tr key={brand.id} className={brand.deletedAt ? "is-deleted" : ""}><td><strong>{brand.name}</strong><span className="admin-product-brand">/{brand.slug}</span></td><td><span className={`status-pill ${brand.deletedAt || !brand.isActive ? "status-inactive" : "status-active"}`}>{brand.deletedAt ? "Deleted" : brand.isActive ? "Active" : "Inactive"}</span></td><td><div className="admin-row-actions">{brand.deletedAt ? <button type="button" className="admin-view-link" aria-label={`Restore ${brand.name}`} title="Restore" disabled={busy} onClick={() => restoreBrand(brand)}><RotateCcw size={17} /></button> : <><button type="button" className="admin-view-link" aria-label={`Edit ${brand.name}`} title="Edit" onClick={() => editBrand(brand)}><Pencil size={17} /></button><button type="button" className="admin-view-link reference-delete-button" aria-label={`Delete ${brand.name}`} title="Delete" disabled={busy} onClick={() => removeBrand(brand)}><Trash2 size={17} /></button></>}</div></td></tr>)}</tbody></table></div>
           )}
-        </section>
+        </section>}
 
-        <section className="admin-products-panel admin-product-types-panel">
+        {section === "product-types" && <section className="admin-products-panel admin-product-types-panel">
           <div className="admin-panel-heading">
             <div><h2>Product types</h2><p>Types group products by shared behavior, such as Clothing, Phone, or Shoes.</p></div>
             <button type="button" className="btn btn-primary" onClick={startNewProductType}><Plus size={17} /> Add product type</button>
@@ -495,7 +517,7 @@ export const AdminCatalogSettingsPage: React.FC = () => {
           {loading ? <div className="admin-empty-state">Loading product types...</div> : (
             <div className="admin-table-wrap"><table className="admin-product-table admin-reference-table"><thead><tr><th>Product type</th><th>Description</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{productTypes.map((type) => <tr key={type.id} className={type.deletedAt ? "is-deleted" : ""}><td><strong>{type.name}</strong><span className="admin-product-brand">/{type.slug}</span></td><td>{type.description || "—"}</td><td><span className={`status-pill ${type.deletedAt || !type.isActive ? "status-inactive" : "status-active"}`}>{type.deletedAt ? "Deleted" : type.isActive ? "Active" : "Inactive"}</span></td><td><div className="admin-row-actions">{type.deletedAt ? <button type="button" className="admin-view-link" aria-label={`Restore ${type.name}`} title="Restore" disabled={busy} onClick={() => restoreProductType(type)}><RotateCcw size={17} /></button> : <><button type="button" className="admin-view-link" aria-label={`Edit ${type.name}`} title="Edit" onClick={() => editProductType(type)}><Pencil size={17} /></button><button type="button" className="admin-view-link reference-delete-button" aria-label={`Delete ${type.name}`} title="Delete" disabled={busy} onClick={() => removeProductType(type)}><Trash2 size={17} /></button></>}</div></td></tr>)}</tbody></table></div>
           )}
-        </section>
+        </section>}
       </div>
     </div>
   );

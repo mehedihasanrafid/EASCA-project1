@@ -55,7 +55,7 @@ export const AdminOrdersPage: React.FC = () => {
     <div className="dashboard-container">
       <Link to="/admin" className="product-back-link">
         <ArrowLeft size={18} />
-        Products
+        Admin overview
       </Link>
 
       <div className="mb-8 flex items-end justify-between gap-8 max-[700px]:flex-col max-[700px]:items-start">

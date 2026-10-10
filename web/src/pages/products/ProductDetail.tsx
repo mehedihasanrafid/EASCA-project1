@@ -22,6 +22,7 @@ export const ProductDetail: React.FC = () => {
   const location = useLocation();
   const [product, setProduct] = useState<Product | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState("");
+  const [selectedOptionValues, setSelectedOptionValues] = useState<Record<string, string>>({});
   const [quantity, setQuantity] = useState(1);
   const [selectedMediaId, setSelectedMediaId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -41,6 +42,11 @@ export const ProductDetail: React.FC = () => {
           result.variants?.find((variant) => variant.isDefault && variant.inStock) ??
           result.variants?.find((variant) => variant.inStock);
         setSelectedVariantId(defaultVariant?.id ?? "");
+        setSelectedOptionValues(
+          Object.fromEntries(
+            (defaultVariant?.optionValues ?? []).map((value) => [value.attribute.id, value.id]),
+          ),
+        );
         const initialMedia =
           result.media?.find((item) => item.isPrimary) ?? result.media?.[0];
         setSelectedMediaId(initialMedia?.id ?? "");
@@ -63,10 +69,23 @@ export const ProductDetail: React.FC = () => {
     [product, selectedVariantId],
   );
 
-  const mediaItems = useMemo(
-    () => [...(product?.media ?? [])].sort((left, right) => left.sortOrder - right.sortOrder),
-    [product],
-  );
+  const mediaItems = useMemo(() => {
+    const allMedia = product?.media ?? [];
+    const matchingMedia = allMedia.filter(
+      (item) => item.variantId === null || item.variantId === selectedVariantId,
+    );
+    return [...matchingMedia].sort((left, right) => {
+      if (left.variantId === selectedVariantId && right.variantId !== selectedVariantId) return -1;
+      if (right.variantId === selectedVariantId && left.variantId !== selectedVariantId) return 1;
+      return left.sortOrder - right.sortOrder;
+    });
+  }, [product, selectedVariantId]);
+
+  useEffect(() => {
+    if (!mediaItems.some((item) => item.id === selectedMediaId)) {
+      setSelectedMediaId(mediaItems[0]?.id ?? "");
+    }
+  }, [mediaItems, selectedMediaId]);
   const selectedMedia =
     mediaItems.find((item) => item.id === selectedMediaId) ?? mediaItems[0];
 
@@ -76,6 +95,44 @@ export const ProductDetail: React.FC = () => {
     const nextIndex = (currentIndex + direction + mediaItems.length) % mediaItems.length;
     setSelectedMediaId(mediaItems[nextIndex].id);
   };
+
+  const chooseOption = (attributeId: string, valueId: string) => {
+    if (!product) return;
+    const next = { ...selectedOptionValues, [attributeId]: valueId };
+    const optionCount = product.options?.length ?? 0;
+    const exactVariant = product.variants?.find((variant) =>
+      variant.optionValues.length === optionCount &&
+      variant.optionValues.every((value) => next[value.attribute.id] === value.id),
+    );
+    const compatibleVariant = exactVariant ?? product.variants
+      ?.filter((variant) =>
+        variant.inStock &&
+        variant.optionValues.some((value) => value.attribute.id === attributeId && value.id === valueId),
+      )
+      .sort((left, right) => {
+        const matchingSelections = (variant: typeof left) => variant.optionValues.filter(
+          (value) => value.attribute.id !== attributeId && selectedOptionValues[value.attribute.id] === value.id,
+        ).length;
+        return matchingSelections(right) - matchingSelections(left);
+      })[0];
+
+    if (compatibleVariant) {
+      setSelectedOptionValues(Object.fromEntries(
+        compatibleVariant.optionValues.map((value) => [value.attribute.id, value.id]),
+      ));
+      setSelectedVariantId(compatibleVariant.id);
+    } else {
+      setSelectedOptionValues(next);
+      setSelectedVariantId("");
+    }
+    setQuantity(1);
+  };
+
+  const optionIsAvailable = (attributeId: string, valueId: string) =>
+    Boolean(product?.variants?.some((variant) =>
+      variant.inStock &&
+      variant.optionValues.some((value) => value.attribute.id === attributeId && value.id === valueId),
+    ));
 
   const handleAddToCart = async () => {
     if (!user) {
@@ -190,7 +247,37 @@ export const ProductDetail: React.FC = () => {
           <p className="product-detail-price">{priceFormatter.format(Number(displayedPrice))}</p>
           {product.shortDescription && <p className="product-detail-summary">{product.shortDescription}</p>}
 
-          {(product.variants?.length ?? 0) > 0 && (
+          {(product.options?.length ?? 0) > 0 ? (
+            <div className="product-option-groups">
+              {product.options?.map((option) => (
+                <fieldset className="product-option-group" key={option.attribute.id}>
+                  <legend>{option.attribute.name}</legend>
+                  <div className="product-option-values">
+                    {option.values.map((value) => {
+                      const selected = selectedOptionValues[option.attribute.id] === value.id;
+                      const available = optionIsAvailable(option.attribute.id, value.id);
+                      return (
+                        <button
+                          key={value.id}
+                          type="button"
+                          className={`product-option-button${selected ? " is-selected" : ""}`}
+                          disabled={!available}
+                          onClick={() => chooseOption(option.attribute.id, value.id)}
+                          aria-pressed={selected}
+                        >
+                          {option.attribute.inputType === "COLOR" && value.colorHex && (
+                            <span className="product-color-swatch" style={{ backgroundColor: value.colorHex }} aria-hidden="true" />
+                          )}
+                          {value.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              ))}
+              {!selectedVariant && <p className="product-option-help">Choose one value from every option.</p>}
+            </div>
+          ) : (product.variants?.length ?? 0) > 0 && (
             <div className="form-group">
               <label htmlFor="variant">Product option</label>
               <select

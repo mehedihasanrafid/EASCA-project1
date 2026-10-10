@@ -38,6 +38,34 @@ export interface AdminProductType {
   deletedAt: string | null;
 }
 
+export interface AdminAttributeValue {
+  id: string;
+  attributeId: string;
+  label: string;
+  code: string;
+  colorHex: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  deletedAt: string | null;
+}
+
+export interface AdminAttribute {
+  id: string;
+  name: string;
+  code: string;
+  inputType: "SELECT" | "COLOR" | "TEXT";
+  isActive: boolean;
+  values: AdminAttributeValue[];
+  deletedAt: string | null;
+}
+
+export interface ProductTypeAttributeAssignment {
+  attributeId: string;
+  isRequired: boolean;
+  sortOrder: number;
+  attribute: AdminAttribute;
+}
+
 export interface SaveCategoryInput {
   name: string;
   slug?: string;
@@ -142,4 +170,55 @@ export const adminCatalogApi = {
     apiClient<{ productType: AdminProductType }>(`/admin/product-types/${id}/restore`, {
       method: "POST",
     }).then(({ productType }) => productType),
+
+  getAttributes: (includeDeleted = true) =>
+    apiClient<{ attributes: AdminAttribute[] }>(
+      `/admin/attributes?includeDeleted=${includeDeleted}`,
+      { method: "GET" },
+    ).then(({ attributes }) => attributes),
+
+  createAttribute: (input: { name: string; code?: string; inputType: AdminAttribute["inputType"]; isActive?: boolean }) =>
+    apiClient<{ attribute: AdminAttribute }>("/admin/attributes", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }).then(({ attribute }) => attribute),
+
+  updateAttribute: (id: string, input: Partial<{ name: string; code: string; inputType: AdminAttribute["inputType"]; isActive: boolean }>) =>
+    apiClient<{ attribute: AdminAttribute }>(`/admin/attributes/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }).then(({ attribute }) => attribute),
+
+  deleteAttribute: (id: string) =>
+    apiClient<void>(`/admin/attributes/${id}`, { method: "DELETE" }),
+
+  restoreAttribute: (id: string) =>
+    apiClient<{ attribute: AdminAttribute }>(`/admin/attributes/${id}/restore`, { method: "POST" }).then(({ attribute }) => attribute),
+
+  createAttributeValue: (attributeId: string, input: { label: string; code?: string; colorHex?: string | null; sortOrder?: number; isActive?: boolean }) =>
+    apiClient<{ value: AdminAttributeValue }>(`/admin/attributes/${attributeId}/values`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }).then(({ value }) => value),
+
+  updateAttributeValue: (attributeId: string, valueId: string, input: Partial<{ label: string; code: string; colorHex: string | null; sortOrder: number; isActive: boolean }>) =>
+    apiClient<{ value: AdminAttributeValue }>(`/admin/attributes/${attributeId}/values/${valueId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }).then(({ value }) => value),
+
+  deleteAttributeValue: (attributeId: string, valueId: string) =>
+    apiClient<void>(`/admin/attributes/${attributeId}/values/${valueId}`, { method: "DELETE" }),
+
+  restoreAttributeValue: (attributeId: string, valueId: string) =>
+    apiClient<{ value: AdminAttributeValue }>(`/admin/attributes/${attributeId}/values/${valueId}/restore`, { method: "POST" }).then(({ value }) => value),
+
+  getProductTypeAttributes: (productTypeId: string) =>
+    apiClient<{ attributes: ProductTypeAttributeAssignment[] }>(`/admin/product-types/${productTypeId}/attributes`, { method: "GET" }).then(({ attributes }) => attributes),
+
+  setProductTypeAttributes: (productTypeId: string, attributes: Array<{ attributeId: string; isRequired: boolean; sortOrder: number }>) =>
+    apiClient<{ attributes: ProductTypeAttributeAssignment[] }>(`/admin/product-types/${productTypeId}/attributes`, {
+      method: "PUT",
+      body: JSON.stringify({ attributes }),
+    }).then(({ attributes: result }) => result),
 };

@@ -25,6 +25,29 @@ export interface ProductVariant {
   inStock: boolean;
   weight: Money | null;
   isDefault: boolean;
+  optionValues: ProductOptionValue[];
+  costPrice?: Money | null;
+  isActive?: boolean;
+}
+
+export interface ProductOptionValue {
+  id: string;
+  label: string;
+  code: string;
+  colorHex: string | null;
+  attribute: ProductOptionAttribute;
+}
+
+export interface ProductOptionAttribute {
+  id: string;
+  name: string;
+  code: string;
+  inputType: "SELECT" | "COLOR" | "TEXT";
+}
+
+export interface ProductOption {
+  attribute: ProductOptionAttribute;
+  values: Array<Omit<ProductOptionValue, "attribute">>;
 }
 
 export interface ProductTaxonomy {
@@ -50,6 +73,7 @@ export interface Product {
   inStock: boolean;
   primaryImage: ProductMedia | null;
   variants?: ProductVariant[];
+  options?: ProductOption[];
   media?: ProductMedia[];
   createdAt: string;
   updatedAt: string;

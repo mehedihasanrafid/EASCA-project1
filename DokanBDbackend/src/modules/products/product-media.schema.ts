@@ -7,6 +7,7 @@ export const createProductMediaSchema = z.object({
 
 export const updateProductMediaSchema = z
   .object({
+    variantId: z.union([z.string().regex(/^[1-9]\d*$/), z.null()]).optional(),
     altText: z.string().trim().max(255).nullable().optional(),
     sortOrder: z.coerce.number().int().min(0).optional(),
     isPrimary: z.boolean().optional(),
@@ -15,7 +16,8 @@ export const updateProductMediaSchema = z
     (input) =>
       input.altText !== undefined ||
       input.sortOrder !== undefined ||
-      input.isPrimary !== undefined,
+      input.isPrimary !== undefined ||
+      input.variantId !== undefined,
     { message: "Provide at least one field to update." },
   );
 

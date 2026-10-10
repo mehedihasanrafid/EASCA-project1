@@ -149,6 +149,7 @@ const variantFields = {
   weight: z.union([z.coerce.number().finite().min(0).max(99_999_999.99), z.null()]).optional(),
   isDefault: z.boolean().optional(),
   isActive: z.boolean().optional(),
+  optionValueIds: z.array(entityIdSchema).max(20).optional(),
 };
 
 export const createProductVariantSchema = z.object(variantFields).strict();
@@ -168,6 +169,7 @@ export const updateProductVariantSchema = z
     weight: variantFields.weight,
     isDefault: variantFields.isDefault,
     isActive: variantFields.isActive,
+    optionValueIds: variantFields.optionValueIds,
   })
   .strict()
   .refine((input) => Object.keys(input).length > 0, {
@@ -190,4 +192,12 @@ export type CreateProductVariantInput = z.infer<
 >;
 export type UpdateProductVariantInput = z.infer<
   typeof updateProductVariantSchema
+>;
+
+export const createProductVariantsBulkSchema = z.object({
+  variants: z.array(createProductVariantSchema).min(1).max(200),
+}).strict();
+
+export type CreateProductVariantsBulkInput = z.infer<
+  typeof createProductVariantsBulkSchema
 >;

@@ -1,4 +1,4 @@
-type HttpMethod = "get" | "post" | "patch" | "delete";
+type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
 type OpenApiObject = Record<string, unknown>;
 
 interface EndpointDefinition {
@@ -452,6 +452,68 @@ const endpointDefinitions: EndpointDefinition[] = [
     conflict: true,
   },
   {
+    method: "get", path: "/admin/attributes", tag: "Admin product properties",
+    summary: "List reusable product properties and their values", auth: true, admin: true,
+    parameters: [queryParameter("includeDeleted", { type: "boolean", default: false })],
+    responseSchema: "AdminAttributeListResponse",
+  },
+  {
+    method: "post", path: "/admin/attributes", tag: "Admin product properties",
+    summary: "Create a reusable product property", auth: true, admin: true,
+    body: "AttributeRequest", success: "201", responseSchema: "AdminAttributeResponse", conflict: true,
+  },
+  {
+    method: "patch", path: "/admin/attributes/{id}", tag: "Admin product properties",
+    summary: "Update a product property", auth: true, admin: true,
+    parameters: [idParameter("id", "Attribute ID")], body: "UpdateAttributeRequest",
+    responseSchema: "AdminAttributeResponse", notFound: true, conflict: true,
+  },
+  {
+    method: "delete", path: "/admin/attributes/{id}", tag: "Admin product properties",
+    summary: "Soft-delete a product property", auth: true, admin: true,
+    parameters: [idParameter("id", "Attribute ID")], success: "204", notFound: true,
+  },
+  {
+    method: "post", path: "/admin/attributes/{id}/restore", tag: "Admin product properties",
+    summary: "Restore a product property", auth: true, admin: true,
+    parameters: [idParameter("id", "Attribute ID")], responseSchema: "AdminAttributeResponse", notFound: true, conflict: true,
+  },
+  {
+    method: "post", path: "/admin/attributes/{id}/values", tag: "Admin product properties",
+    summary: "Add a value to a product property", auth: true, admin: true,
+    parameters: [idParameter("id", "Attribute ID")], body: "AttributeValueRequest", success: "201",
+    responseSchema: "AdminAttributeValueResponse", notFound: true, conflict: true,
+  },
+  {
+    method: "patch", path: "/admin/attributes/{id}/values/{valueId}", tag: "Admin product properties",
+    summary: "Update a property value", auth: true, admin: true,
+    parameters: [idParameter("id", "Attribute ID"), idParameter("valueId", "Attribute value ID")],
+    body: "UpdateAttributeValueRequest", responseSchema: "AdminAttributeValueResponse", notFound: true, conflict: true,
+  },
+  {
+    method: "delete", path: "/admin/attributes/{id}/values/{valueId}", tag: "Admin product properties",
+    summary: "Soft-delete a property value", auth: true, admin: true,
+    parameters: [idParameter("id", "Attribute ID"), idParameter("valueId", "Attribute value ID")],
+    success: "204", notFound: true,
+  },
+  {
+    method: "post", path: "/admin/attributes/{id}/values/{valueId}/restore", tag: "Admin product properties",
+    summary: "Restore a property value", auth: true, admin: true,
+    parameters: [idParameter("id", "Attribute ID"), idParameter("valueId", "Attribute value ID")],
+    responseSchema: "AdminAttributeValueResponse", notFound: true, conflict: true,
+  },
+  {
+    method: "get", path: "/admin/product-types/{productTypeId}/attributes", tag: "Admin product properties",
+    summary: "List properties assigned to a product type", auth: true, admin: true,
+    parameters: [idParameter("productTypeId", "Product type ID")], responseSchema: "ProductTypeAttributeListResponse", notFound: true,
+  },
+  {
+    method: "put", path: "/admin/product-types/{productTypeId}/attributes", tag: "Admin product properties",
+    summary: "Replace the properties assigned to a product type", auth: true, admin: true,
+    parameters: [idParameter("productTypeId", "Product type ID")], body: "SetProductTypeAttributesRequest",
+    responseSchema: "ProductTypeAttributeListResponse", notFound: true,
+  },
+  {
     method: "get",
     path: "/products",
     tag: "Products",
@@ -599,6 +661,19 @@ const endpointDefinitions: EndpointDefinition[] = [
     admin: true,
     parameters: [idParameter("productId", "Product ID")],
     body: "ProductVariantRequest",
+    success: "201",
+    notFound: true,
+    conflict: true,
+  },
+  {
+    method: "post",
+    path: "/admin/products/{productId}/variants/bulk",
+    tag: "Admin products",
+    summary: "Create multiple option combinations in one transaction",
+    auth: true,
+    admin: true,
+    parameters: [idParameter("productId", "Product ID")],
+    body: "BulkProductVariantRequest",
     success: "201",
     notFound: true,
     conflict: true,
@@ -810,6 +885,17 @@ const endpointDefinitions: EndpointDefinition[] = [
   },
   {
     method: "get",
+    path: "/admin/dashboard",
+    tag: "Admin dashboard",
+    summary: "Get store sales, order, inventory, and best-seller analytics",
+    description:
+      "Sales exclude cancelled orders and failed or refunded payments. Daily sales cover the latest 30 calendar days.",
+    auth: true,
+    admin: true,
+    responseSchema: "AdminDashboardResponse",
+  },
+  {
+    method: "get",
     path: "/admin/orders",
     tag: "Admin orders",
     summary: "Search, filter, and paginate orders",
@@ -1011,6 +1097,21 @@ const productTypeProperties = {
   isActive: { type: "boolean" },
 };
 
+const attributeProperties = {
+  name: { type: "string", minLength: 2, maxLength: 100 },
+  code: { type: "string", pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+  inputType: { type: "string", enum: ["SELECT", "COLOR", "TEXT"] },
+  isActive: { type: "boolean" },
+};
+
+const attributeValueProperties = {
+  label: { type: "string", minLength: 1, maxLength: 100 },
+  code: { type: "string", pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+  colorHex: { type: "string", nullable: true, pattern: "^#[0-9a-fA-F]{6}$" },
+  sortOrder: { type: "integer", minimum: 0 },
+  isActive: { type: "boolean" },
+};
+
 const productProperties = {
   productTypeId: { type: "string", example: "1" },
   categoryId: { type: "string", example: "1" },
@@ -1047,6 +1148,13 @@ const variantProperties = {
   weight: { type: "number", minimum: 0, nullable: true },
   isDefault: { type: "boolean" },
   isActive: { type: "boolean" },
+  optionValueIds: {
+    type: "array",
+    maxItems: 20,
+    uniqueItems: true,
+    items: { type: "string", pattern: "^[1-9][0-9]*$" },
+    description: "One value per property assigned to the product type.",
+  },
 };
 
 export const openApiDocument = {
@@ -1069,10 +1177,12 @@ export const openApiDocument = {
     { name: "Admin categories" },
     { name: "Admin brands" },
     { name: "Admin product types" },
+    { name: "Admin product properties" },
     { name: "Products" },
     { name: "Admin products" },
     { name: "Cart" },
     { name: "Orders" },
+    { name: "Admin dashboard" },
     { name: "Admin orders" },
   ],
   paths: buildPaths(),
@@ -1461,6 +1571,85 @@ export const openApiDocument = {
           data: { type: "object", required: ["productTypes"], properties: { productTypes: { type: "array", items: schemaRef("AdminProductType") } } },
         },
       },
+      AttributeRequest: {
+        type: "object",
+        required: ["name"],
+        properties: attributeProperties,
+      },
+      UpdateAttributeRequest: {
+        type: "object",
+        minProperties: 1,
+        properties: attributeProperties,
+      },
+      AttributeValueRequest: {
+        type: "object",
+        required: ["label"],
+        properties: attributeValueProperties,
+      },
+      UpdateAttributeValueRequest: {
+        type: "object",
+        minProperties: 1,
+        properties: attributeValueProperties,
+      },
+      AdminAttributeValue: {
+        type: "object",
+        required: ["id", "attributeId", "label", "code", "colorHex", "sortOrder", "isActive", "deletedAt"],
+        properties: {
+          id: { type: "string", example: "8" },
+          attributeId: { type: "string", example: "2" },
+          ...attributeValueProperties,
+          deletedAt: { type: "string", format: "date-time", nullable: true },
+        },
+      },
+      AdminAttribute: {
+        type: "object",
+        required: ["id", "name", "code", "inputType", "isActive", "values", "deletedAt"],
+        properties: {
+          id: { type: "string", example: "2" },
+          ...attributeProperties,
+          values: { type: "array", items: schemaRef("AdminAttributeValue") },
+          deletedAt: { type: "string", format: "date-time", nullable: true },
+        },
+      },
+      AdminAttributeResponse: {
+        type: "object", required: ["success", "data"],
+        properties: { success: { type: "boolean", example: true }, data: { type: "object", required: ["attribute"], properties: { attribute: schemaRef("AdminAttribute") } } },
+      },
+      AdminAttributeValueResponse: {
+        type: "object", required: ["success", "data"],
+        properties: { success: { type: "boolean", example: true }, data: { type: "object", required: ["value"], properties: { value: schemaRef("AdminAttributeValue") } } },
+      },
+      AdminAttributeListResponse: {
+        type: "object", required: ["success", "data"],
+        properties: { success: { type: "boolean", example: true }, data: { type: "object", required: ["attributes"], properties: { attributes: { type: "array", items: schemaRef("AdminAttribute") } } } },
+      },
+      ProductTypeAttributeAssignment: {
+        type: "object",
+        required: ["attributeId", "isRequired", "sortOrder", "attribute"],
+        properties: {
+          attributeId: { type: "string" },
+          isRequired: { type: "boolean" },
+          sortOrder: { type: "integer", minimum: 0 },
+          attribute: schemaRef("AdminAttribute"),
+        },
+      },
+      SetProductTypeAttributesRequest: {
+        type: "object",
+        required: ["attributes"],
+        properties: {
+          attributes: {
+            type: "array", maxItems: 50,
+            items: {
+              type: "object", required: ["attributeId"],
+              properties: { attributeId: { type: "string" }, isRequired: { type: "boolean" }, sortOrder: { type: "integer", minimum: 0 } },
+            },
+          },
+        },
+      },
+      ProductTypeAttributeListResponse: {
+        type: "object", required: ["success", "data"],
+        properties: { success: { type: "boolean", example: true }, data: { type: "object", required: ["attributes"], properties: { attributes: { type: "array", items: schemaRef("ProductTypeAttributeAssignment") } } } },
+      },
       ProductRequest: {
         type: "object",
         required: [
@@ -1482,6 +1671,13 @@ export const openApiDocument = {
         required: ["sku", "price"],
         properties: variantProperties,
       },
+      BulkProductVariantRequest: {
+        type: "object",
+        required: ["variants"],
+        properties: {
+          variants: { type: "array", minItems: 1, maxItems: 200, items: schemaRef("ProductVariantRequest") },
+        },
+      },
       UpdateProductVariantRequest: {
         type: "object",
         minProperties: 1,
@@ -1491,6 +1687,7 @@ export const openApiDocument = {
         type: "object",
         minProperties: 1,
         properties: {
+          variantId: { type: "string", nullable: true },
           altText: { type: "string", nullable: true, maxLength: 255 },
           sortOrder: { type: "integer", minimum: 0 },
           isPrimary: { type: "boolean" },
@@ -1859,6 +2056,95 @@ export const openApiDocument = {
                 },
               },
             },
+          },
+        },
+      },
+      AdminDashboard: {
+        type: "object",
+        required: [
+          "summary",
+          "dailySales",
+          "bestSellingProducts",
+          "lowStockProducts",
+          "generatedAt",
+        ],
+        properties: {
+          summary: {
+            type: "object",
+            required: ["totalSales", "totalOrders", "todayOrders", "lowStockCount", "currency"],
+            properties: {
+              totalSales: { type: "string", example: "154820.00" },
+              totalOrders: { type: "integer", minimum: 0, example: 128 },
+              todayOrders: { type: "integer", minimum: 0, example: 7 },
+              lowStockCount: { type: "integer", minimum: 0, example: 4 },
+              currency: { type: "string", example: "BDT" },
+            },
+          },
+          dailySales: {
+            type: "array",
+            minItems: 30,
+            maxItems: 30,
+            items: {
+              type: "object",
+              required: ["date", "sales", "orderCount"],
+              properties: {
+                date: { type: "string", format: "date", example: "2026-10-10" },
+                sales: { type: "string", example: "8920.00" },
+                orderCount: { type: "integer", minimum: 0, example: 5 },
+              },
+            },
+          },
+          bestSellingProducts: {
+            type: "array",
+            maxItems: 6,
+            items: {
+              type: "object",
+              required: ["productId", "productName", "quantitySold", "sales"],
+              properties: {
+                productId: { type: "string", nullable: true },
+                productName: { type: "string" },
+                quantitySold: { type: "integer", minimum: 0 },
+                sales: { type: "string" },
+              },
+            },
+          },
+          lowStockProducts: {
+            type: "array",
+            maxItems: 8,
+            items: {
+              type: "object",
+              required: [
+                "productId",
+                "productName",
+                "variantId",
+                "variantName",
+                "sku",
+                "stockQuantity",
+                "lowStockLevel",
+              ],
+              properties: {
+                productId: { type: "string" },
+                productName: { type: "string" },
+                variantId: { type: "string" },
+                variantName: { type: "string" },
+                sku: { type: "string" },
+                stockQuantity: { type: "integer", minimum: 0 },
+                lowStockLevel: { type: "integer", minimum: 0 },
+              },
+            },
+          },
+          generatedAt: { type: "string", format: "date-time" },
+        },
+      },
+      AdminDashboardResponse: {
+        type: "object",
+        required: ["success", "data"],
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            required: ["dashboard"],
+            properties: { dashboard: schemaRef("AdminDashboard") },
           },
         },
       },

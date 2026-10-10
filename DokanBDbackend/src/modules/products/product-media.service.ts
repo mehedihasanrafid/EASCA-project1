@@ -132,6 +132,16 @@ export async function updateProductImage(
     if (input.isPrimary === true) {
       await repository.update({ productId, isPrimary: true }, { isPrimary: false });
     }
+    if (input.variantId !== undefined && input.variantId !== null) {
+      const variant = await manager.getRepository(ProductVariant).findOneBy({
+        id: input.variantId,
+        productId,
+      });
+      if (!variant) {
+        throw new AppError(400, "VARIANT_INVALID", "Variant does not belong to this product.");
+      }
+    }
+    if (input.variantId !== undefined) media.variantId = input.variantId;
     if (input.altText !== undefined) media.altText = input.altText;
     if (input.sortOrder !== undefined) media.sortOrder = input.sortOrder;
     if (input.isPrimary !== undefined) media.isPrimary = input.isPrimary;

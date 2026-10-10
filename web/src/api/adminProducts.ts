@@ -51,6 +51,7 @@ export interface CreateVariantInput {
   stockQuantity: number;
   isDefault: boolean;
   isActive: boolean;
+  optionValueIds?: string[];
 }
 
 export type UpdateVariantInput = Partial<Omit<CreateVariantInput, "isDefault">> & {
@@ -85,10 +86,21 @@ export const adminProductApi = {
       body: JSON.stringify(input),
     }),
 
+  createVariantsBulk: (productId: string, variants: CreateVariantInput[]) =>
+    apiClient(`/admin/products/${productId}/variants/bulk`, {
+      method: "POST",
+      body: JSON.stringify({ variants }),
+    }),
+
   updateVariant: (productId: string, variantId: string, input: UpdateVariantInput) =>
     apiClient(`/admin/products/${productId}/variants/${variantId}`, {
       method: "PATCH",
       body: JSON.stringify(input),
+    }),
+
+  deleteVariant: (productId: string, variantId: string) =>
+    apiClient<void>(`/admin/products/${productId}/variants/${variantId}`, {
+      method: "DELETE",
     }),
 
   updateProduct: (productId: string, input: Partial<CreateProductInput>) =>
@@ -97,10 +109,11 @@ export const adminProductApi = {
       body: JSON.stringify(input),
     }).then(({ product }) => product),
 
-  uploadMedia: (productId: string, files: File[], altText?: string) => {
+  uploadMedia: (productId: string, files: File[], altText?: string, variantId?: string) => {
     const body = new FormData();
     files.forEach((file) => body.append("media", file));
     if (altText) body.append("altText", altText);
+    if (variantId) body.append("variantId", variantId);
 
     return apiClient<{ media: ProductMedia[] }>(`/admin/products/${productId}/media`, {
       method: "POST",
@@ -111,7 +124,7 @@ export const adminProductApi = {
   updateMedia: (
     productId: string,
     mediaId: string,
-    input: { altText?: string | null; sortOrder?: number; isPrimary?: boolean },
+    input: { altText?: string | null; sortOrder?: number; isPrimary?: boolean; variantId?: string | null },
   ) =>
     apiClient<{ media: ProductMedia }>(`/admin/products/${productId}/media/${mediaId}`, {
       method: "PATCH",

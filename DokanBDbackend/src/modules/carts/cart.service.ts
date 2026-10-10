@@ -2,6 +2,7 @@ import { In, type EntityManager } from "typeorm";
 
 import { AppDataSource } from "../../database/data-source.js";
 import { AppError } from "../../utils/app-error.js";
+import { loadVariantAttributeSelections } from "../attributes/product-attribute.service.js";
 import { ProductMedia } from "../products/product-media.entity.js";
 import { ProductVariant } from "../products/product-variant.entity.js";
 import { User } from "../users/user.entity.js";
@@ -130,6 +131,9 @@ async function buildCartView(cartId: string, userId: string) {
     .getMany();
 
   const productIds = [...new Set(items.map((item) => item.productVariant.product.id))];
+  const optionValuesByVariant = await loadVariantAttributeSelections(
+    items.map((item) => item.productVariant.id),
+  );
   const imageMedia = productIds.length > 0
     ? await AppDataSource.getRepository(ProductMedia).find({
         where: {
@@ -144,11 +148,17 @@ async function buildCartView(cartId: string, userId: string) {
       })
     : [];
   const primaryImageByProduct = new Map<string, ProductMedia>();
+  const primaryImageByVariant = new Map<string, ProductMedia>();
+  const fallbackImageByProduct = new Map<string, ProductMedia>();
 
   for (const media of imageMedia) {
-    if (!primaryImageByProduct.has(media.productId)) {
+    if (media.variantId && !primaryImageByVariant.has(media.variantId)) {
+      primaryImageByVariant.set(media.variantId, media);
+    }
+    if (!media.variantId && !primaryImageByProduct.has(media.productId)) {
       primaryImageByProduct.set(media.productId, media);
     }
+    if (!fallbackImageByProduct.has(media.productId)) fallbackImageByProduct.set(media.productId, media);
   }
 
   let subtotal = 0n;
@@ -158,7 +168,10 @@ async function buildCartView(cartId: string, userId: string) {
     const unitPrice = toMinorUnits(item.productVariant.price);
     const lineTotal = unitPrice * BigInt(item.quantity);
     const product = item.productVariant.product;
-    const primaryImage = primaryImageByProduct.get(product.id);
+    const primaryImage =
+      primaryImageByVariant.get(item.productVariant.id) ??
+      primaryImageByProduct.get(product.id) ??
+      fallbackImageByProduct.get(product.id);
     const available =
       item.productVariant.deletedAt === null &&
       product.deletedAt === null &&
@@ -183,6 +196,7 @@ async function buildCartView(cartId: string, userId: string) {
         color: item.productVariant.color,
         size: item.productVariant.size,
         stockQuantity: item.productVariant.stockQuantity,
+        optionValues: optionValuesByVariant.get(item.productVariant.id) ?? [],
       },
       product: {
         id: product.id,

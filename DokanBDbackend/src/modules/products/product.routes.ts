@@ -6,6 +6,7 @@ import { requireRole } from "../auth/authorization.middleware.js";
 import {
   createProductForAdmin,
   createVariantForAdmin,
+  createVariantsBulkForAdmin,
   deleteProductForAdmin,
   deleteVariantForAdmin,
   listProducts,
@@ -51,6 +52,7 @@ adminProductRouter.patch("/:id", updateProductForAdmin);
 adminProductRouter.delete("/:id", deleteProductForAdmin);
 adminProductRouter.post("/:id/restore", restoreProductForAdmin);
 adminProductRouter.post("/:productId/variants", createVariantForAdmin);
+adminProductRouter.post("/:productId/variants/bulk", createVariantsBulkForAdmin);
 adminProductRouter.patch(
   "/:productId/variants/:variantId",
   updateVariantForAdmin,

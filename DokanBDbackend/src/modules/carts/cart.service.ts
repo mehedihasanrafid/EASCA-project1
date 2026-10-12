@@ -4,6 +4,8 @@ import { AppDataSource } from "../../database/data-source.js";
 import { AppError } from "../../utils/app-error.js";
 import { loadVariantAttributeSelections } from "../attributes/product-attribute.service.js";
 import { ProductMedia } from "../products/product-media.entity.js";
+import { ProductPriceTier } from "../products/product-price-tier.entity.js";
+import { effectiveVariantPrice } from "../products/product-pricing.js";
 import { ProductVariant } from "../products/product-variant.entity.js";
 import { User } from "../users/user.entity.js";
 import { CartItem } from "./cart-item.entity.js";
@@ -134,8 +136,8 @@ async function buildCartView(cartId: string, userId: string) {
   const optionValuesByVariant = await loadVariantAttributeSelections(
     items.map((item) => item.productVariant.id),
   );
-  const imageMedia = productIds.length > 0
-    ? await AppDataSource.getRepository(ProductMedia).find({
+  const [imageMedia, priceTiers] = productIds.length > 0
+    ? await Promise.all([AppDataSource.getRepository(ProductMedia).find({
         where: {
           productId: In(productIds),
           mediaType: "IMAGE",
@@ -145,8 +147,11 @@ async function buildCartView(cartId: string, userId: string) {
           sortOrder: "ASC",
           createdAt: "ASC",
         },
-      })
-    : [];
+      }), AppDataSource.getRepository(ProductPriceTier).find({
+        where: { productId: In(productIds), isActive: true },
+        order: { minimumQuantity: "ASC" },
+      })])
+    : [[], []] as [ProductMedia[], ProductPriceTier[]];
   const primaryImageByProduct = new Map<string, ProductMedia>();
   const primaryImageByVariant = new Map<string, ProductMedia>();
   const fallbackImageByProduct = new Map<string, ProductMedia>();
@@ -165,7 +170,11 @@ async function buildCartView(cartId: string, userId: string) {
   let totalQuantity = 0;
 
   const publicItems = items.map((item) => {
-    const unitPrice = toMinorUnits(item.productVariant.price);
+    const unitPrice = toMinorUnits(effectiveVariantPrice(
+      item.productVariant,
+      item.quantity,
+      priceTiers,
+    ));
     const lineTotal = unitPrice * BigInt(item.quantity);
     const product = item.productVariant.product;
     const primaryImage =

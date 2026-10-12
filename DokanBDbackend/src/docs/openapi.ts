@@ -335,6 +335,31 @@ const endpointDefinitions: EndpointDefinition[] = [
   },
   {
     method: "get",
+    path: "/admin/categories/{id}/product-types",
+    tag: "Admin categories",
+    summary: "List product types allowed for a category",
+    auth: true,
+    admin: true,
+    parameters: [idParameter("id", "Category ID")],
+    responseSchema: "CategoryProductTypeAssignmentResponse",
+    notFound: true,
+  },
+  {
+    method: "put",
+    path: "/admin/categories/{id}/product-types",
+    tag: "Admin categories",
+    summary: "Replace product types allowed for a category",
+    description: "An assigned type cannot be removed while a product in this category still uses it.",
+    auth: true,
+    admin: true,
+    parameters: [idParameter("id", "Category ID")],
+    body: "SetCategoryProductTypesRequest",
+    responseSchema: "CategoryProductTypeAssignmentResponse",
+    notFound: true,
+    conflict: true,
+  },
+  {
+    method: "get",
     path: "/admin/brands",
     tag: "Admin brands",
     summary: "List brands for administration",
@@ -448,6 +473,31 @@ const endpointDefinitions: EndpointDefinition[] = [
     admin: true,
     parameters: [idParameter("id", "Product type ID")],
     responseSchema: "AdminProductTypeResponse",
+    notFound: true,
+    conflict: true,
+  },
+  {
+    method: "get",
+    path: "/admin/product-types/{id}/brands",
+    tag: "Admin product types",
+    summary: "Get the brand policy for a product type",
+    auth: true,
+    admin: true,
+    parameters: [idParameter("id", "Product type ID")],
+    responseSchema: "ProductTypeBrandAssignmentResponse",
+    notFound: true,
+  },
+  {
+    method: "put",
+    path: "/admin/product-types/{id}/brands",
+    tag: "Admin product types",
+    summary: "Replace the brand policy for a product type",
+    description: "Use ALL to allow every active brand, or SELECTED with explicit brand IDs. A used brand cannot be removed.",
+    auth: true,
+    admin: true,
+    parameters: [idParameter("id", "Product type ID")],
+    body: "SetProductTypeBrandsRequest",
+    responseSchema: "ProductTypeBrandAssignmentResponse",
     notFound: true,
     conflict: true,
   },
@@ -653,6 +703,21 @@ const endpointDefinitions: EndpointDefinition[] = [
     notFound: true,
   },
   {
+    method: "put",
+    path: "/admin/products/{id}/price-tiers",
+    tag: "Admin products",
+    summary: "Replace product and variant quantity price blocks",
+    description:
+      "Replaces every quantity tier for the product. Use variantId null for all variants or an exact variant ID for an individual price block.",
+    auth: true,
+    admin: true,
+    parameters: [idParameter("id", "Product ID")],
+    body: "ReplaceProductPriceTiersRequest",
+    responseSchema: "ProductPriceTierListResponse",
+    notFound: true,
+    conflict: true,
+  },
+  {
     method: "post",
     path: "/admin/products/{productId}/variants",
     tag: "Admin products",
@@ -698,6 +763,7 @@ const endpointDefinitions: EndpointDefinition[] = [
     path: "/admin/products/{productId}/variants/{variantId}",
     tag: "Admin products",
     summary: "Delete a product variant",
+    description: "The variant stock must be zero before it can be removed.",
     auth: true,
     admin: true,
     parameters: [
@@ -711,9 +777,9 @@ const endpointDefinitions: EndpointDefinition[] = [
     method: "post",
     path: "/admin/products/{productId}/media",
     tag: "Admin products",
-    summary: "Upload up to four product images or short videos",
+    summary: "Upload up to four shared or variant media items",
     description:
-      "Accepts JPEG, PNG and WebP images up to the configured image limit, plus MP4 and WebM videos up to the configured video limit. The product may have four media items in total.",
+      "Accepts JPEG, PNG and WebP images up to the configured image limit, plus MP4 and WebM videos up to the configured video limit. A product may have four shared media items and each variant may have four of its own.",
     auth: true,
     admin: true,
     parameters: [idParameter("productId", "Product ID")],
@@ -1126,6 +1192,8 @@ const productProperties = {
   defaultPrice: { type: "number", minimum: 0, example: 1200 },
   defaultCostPrice: { type: "number", minimum: 0, nullable: true },
   discountPrice: { type: "number", minimum: 0, nullable: true },
+  discountStartsAt: { type: "string", format: "date-time", nullable: true },
+  discountEndsAt: { type: "string", format: "date-time", nullable: true },
   status: {
     type: "string",
     enum: ["DRAFT", "ACTIVE", "INACTIVE", "DISCONTINUED"],
@@ -1142,10 +1210,16 @@ const variantProperties = {
   color: { type: "string", nullable: true, maxLength: 100 },
   size: { type: "string", nullable: true, maxLength: 100 },
   price: { type: "number", minimum: 0 },
+  discountPrice: { type: "number", minimum: 0, nullable: true },
+  discountStartsAt: { type: "string", format: "date-time", nullable: true },
+  discountEndsAt: { type: "string", format: "date-time", nullable: true },
   costPrice: { type: "number", minimum: 0, nullable: true },
   stockQuantity: { type: "integer", minimum: 0 },
   lowStockLevel: { type: "integer", minimum: 0 },
   weight: { type: "number", minimum: 0, nullable: true },
+  lengthCm: { type: "number", minimum: 0, maximum: 99999999.99, nullable: true },
+  widthCm: { type: "number", minimum: 0, maximum: 99999999.99, nullable: true },
+  heightCm: { type: "number", minimum: 0, maximum: 99999999.99, nullable: true },
   isDefault: { type: "boolean" },
   isActive: { type: "boolean" },
   optionValueIds: {
@@ -1449,6 +1523,37 @@ export const openApiDocument = {
           },
         },
       },
+      SetCategoryProductTypesRequest: {
+        type: "object",
+        required: ["productTypeIds"],
+        properties: {
+          productTypeIds: {
+            type: "array",
+            minItems: 1,
+            maxItems: 200,
+            uniqueItems: true,
+            items: { type: "string", pattern: "^[1-9][0-9]*$" },
+          },
+        },
+      },
+      CategoryProductTypeAssignmentResponse: {
+        type: "object",
+        required: ["success", "data"],
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            required: ["categoryId", "productTypeIds"],
+            properties: {
+              categoryId: { type: "string", example: "2" },
+              productTypeIds: {
+                type: "array",
+                items: { type: "string", example: "4" },
+              },
+            },
+          },
+        },
+      },
       Brand: {
         type: "object",
         required: ["id", "name", "slug", "logoUrl"],
@@ -1546,10 +1651,11 @@ export const openApiDocument = {
       },
       AdminProductType: {
         type: "object",
-        required: ["id", "name", "slug", "description", "isActive", "createdAt", "updatedAt", "deletedAt"],
+        required: ["id", "name", "slug", "description", "brandMode", "isActive", "createdAt", "updatedAt", "deletedAt"],
         properties: {
           id: { type: "string", example: "1" },
           ...productTypeProperties,
+          brandMode: { type: "string", enum: ["ALL", "SELECTED"] },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
           deletedAt: { type: "string", format: "date-time", nullable: true },
@@ -1569,6 +1675,38 @@ export const openApiDocument = {
         properties: {
           success: { type: "boolean", example: true },
           data: { type: "object", required: ["productTypes"], properties: { productTypes: { type: "array", items: schemaRef("AdminProductType") } } },
+        },
+      },
+      SetProductTypeBrandsRequest: {
+        type: "object",
+        required: ["brandMode", "brandIds"],
+        properties: {
+          brandMode: { type: "string", enum: ["ALL", "SELECTED"] },
+          brandIds: {
+            type: "array",
+            maxItems: 500,
+            uniqueItems: true,
+            items: { type: "string", pattern: "^[1-9][0-9]*$" },
+          },
+        },
+      },
+      ProductTypeBrandAssignmentResponse: {
+        type: "object",
+        required: ["success", "data"],
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            required: ["productTypeId", "brandMode", "brandIds"],
+            properties: {
+              productTypeId: { type: "string", example: "4" },
+              brandMode: { type: "string", enum: ["ALL", "SELECTED"] },
+              brandIds: {
+                type: "array",
+                items: { type: "string", example: "3" },
+              },
+            },
+          },
         },
       },
       AttributeRequest: {
@@ -1682,6 +1820,54 @@ export const openApiDocument = {
         type: "object",
         minProperties: 1,
         properties: variantProperties,
+      },
+      ProductPriceTier: {
+        type: "object",
+        required: ["id", "productId", "variantId", "minimumQuantity", "unitPrice", "isPromotion", "isActive"],
+        properties: {
+          id: { type: "string", example: "1" },
+          productId: { type: "string", example: "12" },
+          variantId: { type: "string", nullable: true, example: "33" },
+          minimumQuantity: { type: "integer", minimum: 2, example: 10 },
+          unitPrice: { type: "string", example: "480.00" },
+          isPromotion: { type: "boolean", example: true },
+          isActive: { type: "boolean", example: true },
+        },
+      },
+      ReplaceProductPriceTiersRequest: {
+        type: "object",
+        required: ["tiers"],
+        properties: {
+          tiers: {
+            type: "array",
+            maxItems: 100,
+            items: {
+              type: "object",
+              required: ["minimumQuantity", "unitPrice"],
+              properties: {
+                variantId: { type: "string", nullable: true },
+                minimumQuantity: { type: "integer", minimum: 2, maximum: 1000000 },
+                unitPrice: { type: "number", minimum: 0 },
+                isPromotion: { type: "boolean", default: false },
+                isActive: { type: "boolean", default: true },
+              },
+            },
+          },
+        },
+      },
+      ProductPriceTierListResponse: {
+        type: "object",
+        required: ["success", "data"],
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            required: ["priceTiers"],
+            properties: {
+              priceTiers: { type: "array", items: schemaRef("ProductPriceTier") },
+            },
+          },
+        },
       },
       UpdateProductMediaRequest: {
         type: "object",

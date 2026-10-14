@@ -129,6 +129,7 @@ export function useProductEditor() {
   };
 
   const catalogController = useProductCatalogOptions({
+    editingProductId,
     form,
     setForm,
     variants: variantDrafts,
@@ -304,6 +305,7 @@ export function useProductEditor() {
         priceTiers,
         media: mediaController.media,
         pendingMedia: mediaController.pendingMedia,
+        attributeAssignments: catalogController.variantBuilder.assignments,
         values: validation.values,
       });
       navigate("/admin/products", {

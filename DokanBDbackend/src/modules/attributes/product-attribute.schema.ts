@@ -14,6 +14,9 @@ export const attributeValueParamsSchema = z.object({
 export const productTypeAttributeParamsSchema = z.object({
   productTypeId: entityIdSchema,
 });
+export const productAttributeAssignmentParamsSchema = z.object({
+  productId: entityIdSchema,
+});
 
 const productAttributeFields = {
   name: z.string().trim().min(2).max(100),
@@ -81,6 +84,39 @@ export const setProductTypeAttributesSchema = z.object({
   });
 });
 
+export const setProductAttributesSchema = z.object({
+  attributes: z.array(z.object({
+    attributeId: entityIdSchema,
+    parentAttributeId: z.union([entityIdSchema, z.null()]).optional(),
+    isRequired: z.boolean().optional(),
+    sortOrder: z.coerce.number().int().min(0).max(1_000_000).optional(),
+  }).strict()).max(20),
+}).strict().superRefine(({ attributes }, context) => {
+  const ids = new Set(attributes.map((item) => item.attributeId));
+  attributes.forEach((attribute, index) => {
+    if (attributes.findIndex((item) => item.attributeId === attribute.attributeId) !== index) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Each attribute can be selected only once for a product.",
+        path: ["attributes", index, "attributeId"],
+      });
+    }
+    if (attribute.parentAttributeId === attribute.attributeId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "An attribute cannot be its own parent.",
+        path: ["attributes", index, "parentAttributeId"],
+      });
+    } else if (attribute.parentAttributeId && !ids.has(attribute.parentAttributeId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "The selected parent must also belong to this product.",
+        path: ["attributes", index, "parentAttributeId"],
+      });
+    }
+  });
+});
+
 export const adminAttributeListQuerySchema = z.object({
   includeDeleted: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
 });
@@ -90,3 +126,4 @@ export type UpdateProductAttributeInput = z.infer<typeof updateProductAttributeS
 export type CreateProductAttributeValueInput = z.infer<typeof createProductAttributeValueSchema>;
 export type UpdateProductAttributeValueInput = z.infer<typeof updateProductAttributeValueSchema>;
 export type SetProductTypeAttributesInput = z.infer<typeof setProductTypeAttributesSchema>;
+export type SetProductAttributesInput = z.infer<typeof setProductAttributesSchema>;

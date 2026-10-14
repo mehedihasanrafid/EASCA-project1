@@ -11,6 +11,7 @@ import {
   assertVariantCombinationAvailable,
   loadVariantAttributeSelections,
   replaceVariantAttributeValues,
+  seedProductAttributesFromType,
   validateVariantOptionValues,
   type VariantAttributeSelection,
 } from "../attributes/product-attribute.service.js";
@@ -656,6 +657,7 @@ async function createVariantWithManager(
   const optionValueIds = input.optionValueIds ?? [];
   const optionValues = await validateVariantOptionValues(
     manager,
+    product.id,
     product.productTypeId,
     optionValueIds,
   );
@@ -996,32 +998,35 @@ export async function createProduct(input: CreateProductInput) {
     ),
   ]);
 
-  const repository = productRepository();
-  const product = repository.create({
-    productTypeId: input.productTypeId,
-    categoryId: input.categoryId,
-    brandId: input.brandId ?? null,
-    name: input.name,
-    slug,
-    shortDescription: input.shortDescription ?? null,
-    description: input.description,
-    defaultPrice: money(input.defaultPrice),
-    defaultCostPrice:
-      input.defaultCostPrice === undefined || input.defaultCostPrice === null
-        ? null
-        : money(input.defaultCostPrice),
-    discountPrice:
-      input.discountPrice === undefined || input.discountPrice === null
-        ? null
-        : money(input.discountPrice),
-    discountStartsAt: dateOrNull(input.discountStartsAt) ?? null,
-    discountEndsAt: dateOrNull(input.discountEndsAt) ?? null,
-    status: input.status ?? "DRAFT",
-    isFeatured: input.isFeatured ?? false,
-    isActive: input.isActive ?? true,
+  const product = await AppDataSource.transaction(async (manager) => {
+    const repository = manager.getRepository(Product);
+    const created = repository.create({
+      productTypeId: input.productTypeId,
+      categoryId: input.categoryId,
+      brandId: input.brandId ?? null,
+      name: input.name,
+      slug,
+      shortDescription: input.shortDescription ?? null,
+      description: input.description,
+      defaultPrice: money(input.defaultPrice),
+      defaultCostPrice:
+        input.defaultCostPrice === undefined || input.defaultCostPrice === null
+          ? null
+          : money(input.defaultCostPrice),
+      discountPrice:
+        input.discountPrice === undefined || input.discountPrice === null
+          ? null
+          : money(input.discountPrice),
+      discountStartsAt: dateOrNull(input.discountStartsAt) ?? null,
+      discountEndsAt: dateOrNull(input.discountEndsAt) ?? null,
+      status: input.status ?? "DRAFT",
+      isFeatured: input.isFeatured ?? false,
+      isActive: input.isActive ?? true,
+    });
+    await repository.save(created);
+    await seedProductAttributesFromType(manager, created.id, created.productTypeId);
+    return created;
   });
-
-  await repository.save(product);
   return getAdminProduct(product.id);
 }
 
@@ -1228,6 +1233,7 @@ export async function updateProductVariant(
       if (!product) throw new AppError(404, "PRODUCT_NOT_FOUND", "Product not found.");
       optionValues = await validateVariantOptionValues(
         manager,
+        product.id,
         product.productTypeId,
         input.optionValueIds,
       );

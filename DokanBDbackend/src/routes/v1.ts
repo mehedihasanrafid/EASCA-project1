@@ -22,6 +22,7 @@ import { userRouter } from "../modules/users/user.routes.js";
 import { adminProductTypeRouter } from "../modules/product-types/product-type.routes.js";
 import {
   adminProductAttributeRouter,
+  adminProductAttributeAssignmentRouter,
   adminProductTypeAttributeRouter,
 } from "../modules/attributes/product-attribute.routes.js";
 import { adminDashboardRouter } from "../modules/admin-dashboard/admin-dashboard.routes.js";
@@ -42,6 +43,7 @@ v1Router.use("/admin/brands", adminBrandRouter);
 v1Router.use("/admin/product-types", adminProductTypeRouter);
 v1Router.use("/admin/product-types", adminProductTypeAttributeRouter);
 v1Router.use("/admin/attributes", adminProductAttributeRouter);
+v1Router.use("/admin/products", adminProductAttributeAssignmentRouter);
 v1Router.use("/admin/products", adminProductRouter);
 v1Router.use("/admin/dashboard", adminDashboardRouter);
 v1Router.use("/admin/coupons", adminCouponRouter);

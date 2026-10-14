@@ -3,10 +3,10 @@ import { AlertCircle, CheckCircle } from "lucide-react";
 import { AdditionalProductDetails } from "./components/AdditionalProductDetails/AdditionalProductDetails";
 import { ProductEditorHeader } from "./components/ProductEditorHeader/ProductEditorHeader";
 import { ProductGeneralSection } from "./components/ProductGeneralSection/ProductGeneralSection";
+import { ProductPreferences } from "./components/ProductPreferences/ProductPreferences";
+import { ProductVariantPaths } from "./components/ProductVariantPaths/ProductVariantPaths";
 import { SelectedSkuEditor } from "./components/SelectedSkuEditor/SelectedSkuEditor";
 import { VariantCombinationsTable } from "./components/VariantCombinationsTable/VariantCombinationsTable";
-import { VariantOptionsSection } from "./components/VariantOptionsSection/VariantOptionsSection";
-import { ProductPreferences } from "./components/ProductPreferences/ProductPreferences";
 import { useProductEditor } from "./hooks/useProductEditor";
 import styles from "./AdminProductEditorPage.module.css";
 
@@ -36,7 +36,7 @@ export const AdminProductEditorPage = () => {
 
         <section className="admin-variant-builder admin-field-wide" aria-label="Product options and variants">
           <div className="variant-config-grid">
-            <VariantOptionsSection builder={builder} />
+            <ProductVariantPaths builder={builder} />
             <aside className="variant-settings-panel" aria-label="Product preferences">
               <ProductPreferences editor={editor} />
             </aside>

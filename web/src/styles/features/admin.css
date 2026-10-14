@@ -807,14 +807,6 @@
 
 .admin-variant-builder { display: grid; gap: 1rem; min-width: 0; }
 .admin-variant-builder .admin-form-divider { margin: 0; }
-.admin-variant-empty { align-items: center; background: #f8fafb; border: 1px dashed var(--color-border, #d7dce2); border-radius: 0.75rem; display: flex; gap: 0.8rem; padding: 1rem; }
-.admin-variant-empty p { margin: 0.2rem 0 0; }
-.admin-option-selector { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
-.admin-option-selector fieldset { border: 1px solid var(--color-border, #d7dce2); border-radius: 0.65rem; margin: 0; padding: 0.75rem; }
-.admin-option-selector legend { font-weight: 700; padding: 0 0.3rem; }
-.admin-option-selector fieldset > div { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.admin-option-selector label { align-items: center; background: #f5f7f9; border-radius: 999px; display: inline-flex; gap: 0.35rem; padding: 0.4rem 0.6rem; }
-.admin-option-selector i { border: 1px solid rgb(0 0 0 / 15%); border-radius: 50%; height: 0.85rem; width: 0.85rem; }
 .admin-variant-error { color: var(--color-danger, #b42318); margin: 0; }
 .admin-variant-table-wrap { contain: layout paint; max-width: 100%; min-width: 0; overflow-x: auto; }
 .admin-variant-table { border-collapse: collapse; min-width: 900px; width: 100%; }
@@ -867,42 +859,6 @@
 .variant-workbench-heading h3 { font-size: 1rem; }
 .variant-workbench-heading p { color: var(--text-muted); font-size: 0.82rem; margin-top: 0.25rem; max-width: 52rem; }
 .variant-workbench-heading .btn { flex: 0 0 auto; }
-
-.admin-option-selector fieldset {
-  background: #fcfdfc;
-  min-width: 0;
-}
-
-.admin-option-selector legend small {
-  color: var(--text-muted);
-  font-size: 0.7rem;
-  font-weight: 600;
-  margin-left: 0.45rem;
-}
-
-.variant-suggestion-label {
-  color: var(--text-muted);
-  font-size: 0.72rem;
-  margin: 0 0 0.6rem;
-}
-
-.variant-value-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.variant-value-chips label:has(input:checked) { background: #e7f5ec; box-shadow: inset 0 0 0 1px #95cbaa; }
-.variant-value-chips input { accent-color: var(--primary); }
-
-.variant-inline-add {
-  align-items: center;
-  border-top: 1px solid var(--border);
-  display: grid !important;
-  gap: 0.5rem !important;
-  grid-template-columns: minmax(0, 1fr) auto;
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-}
-
-.variant-inline-add .btn,
-.variant-generate-button { gap: 0.4rem; }
-.variant-generate-button { justify-self: start; }
 
 .variant-bulk-panel {
   align-items: end;

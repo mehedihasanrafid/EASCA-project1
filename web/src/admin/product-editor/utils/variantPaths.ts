@@ -35,8 +35,28 @@ export function changeVariantPathSelection(
   if (changedIndex < 0) return current;
 
   const next = { ...current, [attributeId]: valueId };
-  for (const assignment of assignments.slice(changedIndex + 1)) {
-    delete next[assignment.attributeId];
+  // Product Type templates created before product-specific parents existed are
+  // still a simple ordered chain.
+  if (!assignments.some((assignment) => Object.hasOwn(assignment, "parentAttributeId"))) {
+    for (const assignment of assignments.slice(changedIndex + 1)) {
+      delete next[assignment.attributeId];
+    }
+    return next;
+  }
+  const descendants = new Set<string>([attributeId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const assignment of assignments) {
+      if (assignment.parentAttributeId && descendants.has(assignment.parentAttributeId) && !descendants.has(assignment.attributeId)) {
+        descendants.add(assignment.attributeId);
+        changed = true;
+      }
+    }
+  }
+  descendants.delete(attributeId);
+  for (const descendantId of descendants) {
+    delete next[descendantId];
   }
   return next;
 }

@@ -16,7 +16,7 @@ export const SelectedSkuEditor = ({ builder, individualDiscountEnabled = true }:
   if (!variant) return null;
 
   return (
-    <section className={`${styles.root} selected-variant-card`} aria-label={`Selected variant ${variant.optionLabel || variant.sku}`}>
+    <section id="selected-sku-editor" className={`${styles.root} selected-variant-card`} aria-label={`Selected variant ${variant.optionLabel || variant.sku}`}>
       <div className="selected-variant-heading">
         <div><span>Selected SKU</span><h3>{variant.optionLabel || "Default"}</h3></div>
         <span className={`variant-status-pill${variant.isActive ? " is-active" : ""}`}>

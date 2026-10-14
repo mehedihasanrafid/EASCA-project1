@@ -6,7 +6,9 @@ import {
   attributeValueParamsSchema,
   createProductAttributeSchema,
   createProductAttributeValueSchema,
+  productAttributeAssignmentParamsSchema,
   productTypeAttributeParamsSchema,
+  setProductAttributesSchema,
   setProductTypeAttributesSchema,
   updateProductAttributeSchema,
   updateProductAttributeValueSchema,
@@ -17,10 +19,12 @@ import {
   deleteProductAttribute,
   deleteProductAttributeValue,
   getProductTypeAttributes,
+  getProductAttributes,
   listProductAttributes,
   restoreProductAttribute,
   restoreProductAttributeValue,
   setProductTypeAttributes,
+  setProductAttributes,
   updateProductAttribute,
   updateProductAttributeValue,
 } from "./product-attribute.service.js";
@@ -67,4 +71,25 @@ export const listProductTypeAttributesForAdmin: RequestHandler = async (request,
 export const setProductTypeAttributesForAdmin: RequestHandler = async (request, response) => {
   const { productTypeId } = productTypeAttributeParamsSchema.parse(request.params);
   response.status(200).json({ success: true, data: { attributes: await setProductTypeAttributes(productTypeId, setProductTypeAttributesSchema.parse(request.body)) } });
+};
+
+export const listProductAttributesForAdmin: RequestHandler = async (request, response) => {
+  const { productId } = productAttributeAssignmentParamsSchema.parse(request.params);
+  response.status(200).json({
+    success: true,
+    data: { attributes: await getProductAttributes(productId) },
+  });
+};
+
+export const setProductAttributesForAdmin: RequestHandler = async (request, response) => {
+  const { productId } = productAttributeAssignmentParamsSchema.parse(request.params);
+  response.status(200).json({
+    success: true,
+    data: {
+      attributes: await setProductAttributes(
+        productId,
+        setProductAttributesSchema.parse(request.body),
+      ),
+    },
+  });
 };

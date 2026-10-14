@@ -14,8 +14,8 @@ describe("OpenAPI documentation", () => {
       0,
     );
 
-    expect(Object.keys(paths)).toHaveLength(64);
-    expect(operationCount).toBe(88);
+    expect(Object.keys(paths)).toHaveLength(65);
+    expect(operationCount).toBe(90);
   });
 
   it("marks protected and administrator operations with bearer security", () => {
@@ -45,8 +45,11 @@ describe("OpenAPI documentation", () => {
     expect(paths["/admin/attributes"]?.get).toBeDefined();
     expect(paths["/admin/attributes/{id}/values"]?.post).toBeDefined();
     expect(paths["/admin/product-types/{productTypeId}/attributes"]?.put).toBeDefined();
+    expect(paths["/admin/products/{productId}/attributes"]?.get).toBeDefined();
+    expect(paths["/admin/products/{productId}/attributes"]?.put).toBeDefined();
     expect(paths["/admin/products/{productId}/variants/bulk"]?.post).toBeDefined();
     expect(components.AdminAttribute).toBeDefined();
+    expect(components.ProductAttributeAssignment).toBeDefined();
     expect(components.BulkProductVariantRequest).toBeDefined();
   });
 

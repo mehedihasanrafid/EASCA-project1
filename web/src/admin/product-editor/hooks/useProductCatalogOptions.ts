@@ -2,6 +2,7 @@ import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
+  AdminAttribute,
   AdminBrand,
   AdminProductType,
   ProductTypeAttributeAssignment,
@@ -30,6 +31,7 @@ import {
 } from "../utils/variantPaths";
 
 interface UseProductCatalogOptionsInput {
+  editingProductId: string | null;
   form: ProductFormState;
   setForm: React.Dispatch<React.SetStateAction<ProductFormState>>;
   variants: VariantDraft[];
@@ -75,6 +77,7 @@ export function useProductCatalogOptions(input: UseProductCatalogOptionsInput) {
   const [categories, setCategories] = useState<FlatCategoryOption[]>([]);
   const [brands, setBrands] = useState<AdminBrand[]>([]);
   const [productTypes, setProductTypes] = useState<AdminProductType[]>([]);
+  const [attributeCatalog, setAttributeCatalog] = useState<AdminAttribute[]>([]);
   const [allowedProductTypeIds, setAllowedProductTypeIds] = useState<string[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
 
@@ -89,20 +92,24 @@ export function useProductCatalogOptions(input: UseProductCatalogOptionsInput) {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [attributesLoading, setAttributesLoading] = useState(false);
   const [variantError, setVariantError] = useState("");
+  const [attributePickerOpen, setAttributePickerOpen] = useState(false);
+  const [addingAttribute, setAddingAttribute] = useState(false);
   const csvInputRef = useRef<HTMLInputElement>(null);
 
   const loadCatalog = useCallback(async () => {
     setCatalogLoading(true);
     input.reportError("");
     try {
-      const [categoryResult, brandResult, typeResult] = await Promise.all([
+      const [categoryResult, brandResult, typeResult, attributeResult] = await Promise.all([
         adminProductApi.getCategories(),
         adminCatalogApi.getBrands(false),
         adminCatalogApi.getProductTypes(false),
+        adminCatalogApi.getAttributes(false),
       ]);
       setCategories(flattenCategories(categoryResult).filter((category) => category.allowProducts));
       setBrands(brandResult.filter((brand) => brand.isActive && !brand.deletedAt));
       setProductTypes(typeResult.filter((type) => type.isActive && !type.deletedAt));
+      setAttributeCatalog(attributeResult.filter((attribute) => attribute.isActive && !attribute.deletedAt));
     } catch (error) {
       input.reportError(error instanceof ApiException
         ? error.error.message
@@ -150,7 +157,8 @@ export function useProductCatalogOptions(input: UseProductCatalogOptionsInput) {
     return () => { current = false; };
   }, [input.form.categoryId, input.reportError, input.setForm, productTypes]);
 
-  // Product type assignments decide which attribute levels can be used.
+  // Product Type assignments seed a new product. Existing products load their
+  // private configuration, so later template edits cannot silently change SKUs.
   useEffect(() => {
     if (!input.form.productTypeId) {
       setAssignments([]);
@@ -159,15 +167,24 @@ export function useProductCatalogOptions(input: UseProductCatalogOptionsInput) {
     }
     setAttributesLoading(true);
     setVariantError("");
-    void adminCatalogApi.getProductTypeAttributes(input.form.productTypeId)
+    const request = input.editingProductId
+      ? adminCatalogApi.getProductAttributes(input.editingProductId)
+      : adminCatalogApi.getProductTypeAttributes(input.form.productTypeId);
+    void request
       .then((items) => {
         const active = items
           .filter((item) => item.attribute.isActive && !item.attribute.deletedAt)
           .sort((left, right) => left.sortOrder - right.sortOrder);
-        setAssignments(active);
+        const configured = active.map((item, index) => ({
+          ...item,
+          parentAttributeId: Object.hasOwn(item, "parentAttributeId")
+            ? item.parentAttributeId ?? null
+            : index === 0 ? null : active[index - 1]!.attributeId,
+        }));
+        setAssignments(configured);
         const seed = input.variants.find((variant) => variant.isDefault) ?? input.variants[0];
         const initial: Record<string, string> = {};
-        for (const item of active) {
+        for (const item of configured) {
           const existingId = seed?.optionValueIds.find((id) =>
             item.attribute.values.some((value) => value.id === id),
           );
@@ -184,7 +201,62 @@ export function useProductCatalogOptions(input: UseProductCatalogOptionsInput) {
       .finally(() => setAttributesLoading(false));
     // Existing rows seed the path only when product type changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input.form.productTypeId]);
+  }, [input.editingProductId, input.form.productTypeId]);
+
+  const addProductAttribute = (attribute: AdminAttribute, parentAttributeId: string | null) => {
+    if (assignments.some((item) => item.attributeId === attribute.id)) {
+      setVariantError(`${attribute.name} is already selected for this product.`);
+      return;
+    }
+    setAssignments((current) => [...current, {
+      attributeId: attribute.id,
+      parentAttributeId,
+      // Product-specific additions begin optional so old SKUs remain valid.
+      isRequired: false,
+      sortOrder: current.length,
+      attribute,
+    }]);
+    setAttributePickerOpen(false);
+    setVariantError("");
+  };
+
+  const createAndAddProductAttribute = async (
+    name: string,
+    values: string[],
+    parentAttributeId: string | null,
+  ) => {
+    setAddingAttribute(true);
+    setVariantError("");
+    try {
+      const created = await adminCatalogApi.createAttribute({
+        name,
+        values,
+        inputType: "SELECT",
+        isActive: true,
+      });
+      setAttributeCatalog((current) => [...current, created].sort((left, right) =>
+        left.name.localeCompare(right.name),
+      ));
+      addProductAttribute(created, parentAttributeId);
+    } catch (error) {
+      setVariantError(error instanceof ApiException
+        ? error.error.message
+        : "Could not create the custom attribute.");
+    } finally {
+      setAddingAttribute(false);
+    }
+  };
+
+  const changeAttributeParent = (attributeId: string, parentAttributeId: string | null) => {
+    setAssignments((current) => current.map((item) =>
+      item.attributeId === attributeId ? { ...item, parentAttributeId } : item,
+    ));
+    setPathSelection((current) => {
+      const next = { ...current };
+      delete next[attributeId];
+      return next;
+    });
+  };
 
   useEffect(() => {
     setSelectedRows((current) => current.filter((key) =>
@@ -409,6 +481,13 @@ export function useProductCatalogOptions(input: UseProductCatalogOptionsInput) {
     loading: catalogLoading,
     variantBuilder: {
       assignments,
+      attributeCatalog,
+      attributePickerOpen,
+      setAttributePickerOpen,
+      addingAttribute,
+      addProductAttribute,
+      createAndAddProductAttribute,
+      changeAttributeParent,
       pathSelection,
       setPathSelection,
       selectedRows,

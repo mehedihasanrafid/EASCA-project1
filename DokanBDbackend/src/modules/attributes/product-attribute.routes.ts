@@ -5,6 +5,7 @@ import {
   createAttributeForAdmin, createAttributeValueForAdmin, deleteAttributeForAdmin,
   deleteAttributeValueForAdmin, listAttributesForAdmin, listProductTypeAttributesForAdmin,
   restoreAttributeForAdmin, restoreAttributeValueForAdmin, setProductTypeAttributesForAdmin,
+  listProductAttributesForAdmin, setProductAttributesForAdmin,
   updateAttributeForAdmin, updateAttributeValueForAdmin,
 } from "./product-attribute.controller.js";
 
@@ -24,3 +25,8 @@ export const adminProductTypeAttributeRouter = Router();
 adminProductTypeAttributeRouter.use(requireAuth, requireRole("ADMIN", "OWNER"));
 adminProductTypeAttributeRouter.get("/:productTypeId/attributes", listProductTypeAttributesForAdmin);
 adminProductTypeAttributeRouter.put("/:productTypeId/attributes", setProductTypeAttributesForAdmin);
+
+export const adminProductAttributeAssignmentRouter = Router();
+adminProductAttributeAssignmentRouter.use(requireAuth, requireRole("ADMIN", "OWNER"));
+adminProductAttributeAssignmentRouter.get("/:productId/attributes", listProductAttributesForAdmin);
+adminProductAttributeAssignmentRouter.put("/:productId/attributes", setProductAttributesForAdmin);

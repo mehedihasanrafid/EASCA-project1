@@ -537,8 +537,22 @@ const endpointDefinitions: EndpointDefinition[] = [
   {
     method: "put", path: "/admin/product-types/{productTypeId}/attributes", tag: "Admin product attributes",
     summary: "Replace the attributes assigned to a product type", auth: true, admin: true,
+    description: "Defines attribute order and required status for this Product Type. Removal is rejected when an existing SKU uses the attribute; making an attribute required is rejected while an active SKU has no value.",
     parameters: [idParameter("productTypeId", "Product type ID")], body: "SetProductTypeAttributesRequest",
-    responseSchema: "ProductTypeAttributeListResponse", notFound: true,
+    responseSchema: "ProductTypeAttributeListResponse", notFound: true, conflict: true,
+  },
+  {
+    method: "get", path: "/admin/products/{productId}/attributes", tag: "Admin product attributes",
+    summary: "List the attributes selected for one product", auth: true, admin: true,
+    description: "Returns the product-private ordered configuration, including optional parent relationships.",
+    parameters: [idParameter("productId", "Product ID")], responseSchema: "ProductAttributeListResponse", notFound: true,
+  },
+  {
+    method: "put", path: "/admin/products/{productId}/attributes", tag: "Admin product attributes",
+    summary: "Replace one product's attribute configuration", auth: true, admin: true,
+    description: "Selects reusable attributes for one product. A null parent makes an attribute independent. Removing an attribute used by a saved SKU is rejected.",
+    parameters: [idParameter("productId", "Product ID")], body: "SetProductAttributesRequest",
+    responseSchema: "ProductAttributeListResponse", notFound: true, conflict: true,
   },
   {
     method: "get",
@@ -1774,6 +1788,39 @@ export const openApiDocument = {
       ProductTypeAttributeListResponse: {
         type: "object", required: ["success", "data"],
         properties: { success: { type: "boolean", example: true }, data: { type: "object", required: ["attributes"], properties: { attributes: { type: "array", items: schemaRef("ProductTypeAttributeAssignment") } } } },
+      },
+      ProductAttributeAssignment: {
+        type: "object",
+        required: ["attributeId", "parentAttributeId", "isRequired", "sortOrder", "attribute"],
+        properties: {
+          attributeId: { type: "string" },
+          parentAttributeId: { type: "string", nullable: true },
+          isRequired: { type: "boolean" },
+          sortOrder: { type: "integer", minimum: 0 },
+          attribute: schemaRef("AdminAttribute"),
+        },
+      },
+      SetProductAttributesRequest: {
+        type: "object",
+        required: ["attributes"],
+        properties: {
+          attributes: {
+            type: "array", maxItems: 20,
+            items: {
+              type: "object", required: ["attributeId"],
+              properties: {
+                attributeId: { type: "string" },
+                parentAttributeId: { type: "string", nullable: true },
+                isRequired: { type: "boolean" },
+                sortOrder: { type: "integer", minimum: 0 },
+              },
+            },
+          },
+        },
+      },
+      ProductAttributeListResponse: {
+        type: "object", required: ["success", "data"],
+        properties: { success: { type: "boolean", example: true }, data: { type: "object", required: ["attributes"], properties: { attributes: { type: "array", items: schemaRef("ProductAttributeAssignment") } } } },
       },
       ProductRequest: {
         type: "object",

@@ -1,5 +1,6 @@
 import type { AdminProduct } from "../../../api/adminProducts";
 import { adminProductApi } from "../../../api/adminProducts";
+import { adminCatalogApi, type ProductTypeAttributeAssignment } from "../../../api/adminCatalog";
 import type { ProductMedia } from "../../../api/products";
 import type {
   PriceTierDraft,
@@ -19,6 +20,7 @@ interface SaveEditorInput {
   priceTiers: PriceTierDraft[];
   media: ProductMedia[];
   pendingMedia: VariantPendingMedia[];
+  attributeAssignments: ProductTypeAttributeAssignment[];
   values: ValidatedEditorValues;
 }
 
@@ -77,6 +79,12 @@ async function replacePriceTiers(
  */
 export async function saveProductEditor(input: SaveEditorInput) {
   const variantInputs = mapVariantInputs(input.variants, input.values);
+  const attributeInputs = input.attributeAssignments.map((assignment, index) => ({
+    attributeId: assignment.attributeId,
+    parentAttributeId: assignment.parentAttributeId ?? null,
+    isRequired: assignment.isRequired,
+    sortOrder: index,
+  }));
 
   if (input.editingProductId) {
     const productId = input.editingProductId;
@@ -84,6 +92,7 @@ export async function saveProductEditor(input: SaveEditorInput) {
       productId,
       mapProductInput(input.form, input.values, input.requestedStatus),
     );
+    await adminCatalogApi.setProductAttributes(productId, attributeInputs);
 
     const variantIdsByKey = new Map<string, string>();
     for (let index = 0; index < input.variants.length; index += 1) {
@@ -120,6 +129,7 @@ export async function saveProductEditor(input: SaveEditorInput) {
     product = await adminProductApi.createProduct(
       mapProductInput(input.form, input.values, "DRAFT"),
     );
+    await adminCatalogApi.setProductAttributes(product.id, attributeInputs);
     const createdVariants = await adminProductApi.createVariantsBulk(product.id, variantInputs);
     const variantIdsByKey = new Map<string, string>();
     input.variants.forEach((draft, index) => {

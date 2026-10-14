@@ -15,15 +15,34 @@ export const productTypeAttributeParamsSchema = z.object({
   productTypeId: entityIdSchema,
 });
 
-export const createProductAttributeSchema = z.object({
+const productAttributeFields = {
   name: z.string().trim().min(2).max(100),
   code: codeSchema.optional(),
   inputType: z.enum(["SELECT", "COLOR", "TEXT"]).default("SELECT"),
   isActive: z.boolean().optional(),
-}).strict();
+};
 
-export const updateProductAttributeSchema = createProductAttributeSchema
+export const createProductAttributeSchema = z.object({
+  ...productAttributeFields,
+  values: z.array(z.string().trim().min(1).max(100)).min(1).max(100).optional(),
+}).strict().superRefine(({ values }, context) => {
+  const seen = new Set<string>();
+  values?.forEach((value, index) => {
+    const key = value.toLocaleLowerCase();
+    if (seen.has(key)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Each attribute value can be added only once.",
+        path: ["values", index],
+      });
+    }
+    seen.add(key);
+  });
+});
+
+export const updateProductAttributeSchema = z.object(productAttributeFields)
   .partial()
+  .strict()
   .refine((input) => Object.keys(input).length > 0, {
     message: "Provide at least one attribute field to update.",
   });

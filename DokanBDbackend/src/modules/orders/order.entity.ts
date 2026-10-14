@@ -40,6 +40,15 @@ export class Order {
   @Column({ name: "discount_total", type: "decimal", precision: 12, scale: 2, default: 0 })
   discountTotal!: string;
 
+  @Column({ name: "product_discount_total", type: "decimal", precision: 12, scale: 2, default: 0 })
+  productDiscountTotal!: string;
+
+  @Column({ name: "coupon_discount_total", type: "decimal", precision: 12, scale: 2, default: 0 })
+  couponDiscountTotal!: string;
+
+  @Column({ name: "coupon_code", type: "varchar", length: 40, nullable: true })
+  couponCode!: string | null;
+
   @Column({ name: "delivery_charge", type: "decimal", precision: 12, scale: 2 })
   deliveryCharge!: string;
 

@@ -22,6 +22,9 @@ const optionalNoteSchema = z
   .nullable()
   .optional();
 
+const optionalCouponCodeSchema = z.string().trim().toUpperCase().min(3).max(40)
+  .regex(/^[A-Z0-9][A-Z0-9_-]*$/).optional();
+
 export const orderIdParamsSchema = z.object({
   orderId: databaseIdSchema,
 });
@@ -29,10 +32,12 @@ export const orderIdParamsSchema = z.object({
 export const checkoutSchema = z.object({
   addressId: databaseIdSchema,
   customerNote: z.string().trim().min(1).max(2000).nullable().optional(),
+  couponCode: optionalCouponCodeSchema,
 });
 
 export const checkoutPreviewQuerySchema = z.object({
   addressId: databaseIdSchema,
+  couponCode: optionalCouponCodeSchema,
 });
 
 export const cancelOrderSchema = z.object({

@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-import type { EntityManager, SelectQueryBuilder } from "typeorm";
+import { In, type EntityManager, type SelectQueryBuilder } from "typeorm";
 
 import { env } from "../../config/env.js";
 import { logger } from "../../config/logger.js";
@@ -14,7 +14,12 @@ import { Address } from "../addresses/address.entity.js";
 import { CartItem } from "../carts/cart-item.entity.js";
 import { Cart } from "../carts/cart.entity.js";
 import { getActiveCart } from "../carts/cart.service.js";
+import { CouponRedemption } from "../coupons/coupon-redemption.entity.js";
+import { Coupon } from "../coupons/coupon.entity.js";
+import { formatCouponMoney, validateCoupon } from "../coupons/coupon.service.js";
 import { InventoryMovement } from "../inventory/inventory-movement.entity.js";
+import { ProductPriceTier } from "../products/product-price-tier.entity.js";
+import { effectiveVariantPrice } from "../products/product-pricing.js";
 import { ProductVariant } from "../products/product-variant.entity.js";
 import { User } from "../users/user.entity.js";
 import { OrderItem } from "./order-item.entity.js";
@@ -173,6 +178,9 @@ function toOrderBase(order: Order) {
     paymentStatus: order.paymentStatus,
     subtotal: order.subtotal,
     discountTotal: order.discountTotal,
+    productDiscountTotal: order.productDiscountTotal,
+    couponDiscountTotal: order.couponDiscountTotal,
+    couponCode: order.couponCode,
     deliveryCharge: order.deliveryCharge,
     grandTotal: order.grandTotal,
     currency: order.currency,
@@ -462,12 +470,17 @@ export async function previewCheckout(
   }
 
   const subtotal = toMinorUnits(cart.totals.subtotal);
+  const productDiscountTotal = toMinorUnits(cart.totals.savingsTotal);
+  const couponResult = input.couponCode
+    ? await validateCoupon(AppDataSource.manager, userId, input.couponCode, subtotal)
+    : null;
+  const couponDiscountTotal = couponResult?.discount ?? 0n;
   const deliveryCharge = numberToMinorUnits(
     address.isInsideDhaka
       ? env.DELIVERY_INSIDE_DHAKA
       : env.DELIVERY_OUTSIDE_DHAKA,
   );
-  const grandTotal = subtotal + deliveryCharge;
+  const grandTotal = subtotal - couponDiscountTotal + deliveryCharge;
 
   if (grandTotal > MAX_MONEY_MINOR_UNITS) {
     throw new AppError(
@@ -480,8 +493,29 @@ export async function previewCheckout(
   return {
     addressId: address.id,
     isInsideDhaka: address.isInsideDhaka,
+    itemCount: cart.totals.itemCount,
+    totalQuantity: cart.totals.totalQuantity,
+    items: cart.items.map((item) => ({
+      id: item.id,
+      productName: item.product.name,
+      variantLabel:
+        item.productVariant.optionValues
+          .map((value) => `${value.attribute.name}: ${value.label}`)
+          .join(" · ") || item.productVariant.variantName,
+      sku: item.productVariant.sku,
+      quantity: item.quantity,
+      regularUnitPrice: item.regularUnitPrice,
+      unitPrice: item.unitPrice,
+      lineTotal: item.lineTotal,
+      savingsTotal: item.savingsTotal,
+      pricing: item.pricing,
+    })),
+    regularSubtotal: cart.totals.regularSubtotal,
     subtotal: formatMinorUnits(subtotal),
-    discountTotal: "0.00",
+    productDiscountTotal: formatMinorUnits(productDiscountTotal),
+    couponDiscountTotal: formatMinorUnits(couponDiscountTotal),
+    couponCode: couponResult?.coupon.code ?? null,
+    discountTotal: formatMinorUnits(productDiscountTotal + couponDiscountTotal),
     deliveryCharge: formatMinorUnits(deliveryCharge),
     grandTotal: formatMinorUnits(grandTotal),
     currency: CURRENCY,
@@ -524,6 +558,13 @@ export async function checkout(userId: string, input: CheckoutInput) {
     const variantIds = cartItems.map((item) => item.productVariantId);
     const variants = await loadLockedVariants(manager, variantIds);
     const variantById = new Map(variants.map((variant) => [variant.id, variant]));
+    const productIds = [...new Set(variants.map((variant) => variant.productId))];
+    const priceTiers = productIds.length > 0
+      ? await manager.getRepository(ProductPriceTier).find({
+          where: { productId: In(productIds), isActive: true },
+          order: { minimumQuantity: "ASC" },
+        })
+      : [];
 
     if (variantById.size !== new Set(variantIds).size) {
       throw new AppError(
@@ -534,6 +575,7 @@ export async function checkout(userId: string, input: CheckoutInput) {
     }
 
     let subtotal = 0n;
+    let discountTotal = 0n;
     const preparedItems: Array<{
       cartItem: CartItem;
       variant: ProductVariant;
@@ -565,7 +607,12 @@ export async function checkout(userId: string, input: CheckoutInput) {
         );
       }
 
-      const unitPrice = toMinorUnits(variant.price);
+      const regularUnitPrice = toMinorUnits(variant.price);
+      const unitPrice = toMinorUnits(effectiveVariantPrice(
+        variant,
+        cartItem.quantity,
+        priceTiers,
+      ));
 
       if (unitPrice < 0n) {
         throw new AppError(
@@ -577,15 +624,23 @@ export async function checkout(userId: string, input: CheckoutInput) {
 
       const lineTotal = unitPrice * BigInt(cartItem.quantity);
       subtotal += lineTotal;
+      if (regularUnitPrice > unitPrice) {
+        discountTotal += (regularUnitPrice - unitPrice) * BigInt(cartItem.quantity);
+      }
       preparedItems.push({ cartItem, variant, unitPrice, lineTotal });
     }
+
+    const couponResult = input.couponCode
+      ? await validateCoupon(manager, userId, input.couponCode, subtotal, true)
+      : null;
+    const couponDiscountTotal = couponResult?.discount ?? 0n;
 
     const deliveryCharge = numberToMinorUnits(
       address.isInsideDhaka
         ? env.DELIVERY_INSIDE_DHAKA
         : env.DELIVERY_OUTSIDE_DHAKA,
     );
-    const grandTotal = subtotal + deliveryCharge;
+    const grandTotal = subtotal - couponDiscountTotal + deliveryCharge;
 
     if (grandTotal > MAX_MONEY_MINOR_UNITS) {
       throw new AppError(
@@ -604,7 +659,10 @@ export async function checkout(userId: string, input: CheckoutInput) {
       paymentMethod: PAYMENT_METHOD,
       paymentStatus: PENDING_PAYMENT_STATUS,
       subtotal: formatMinorUnits(subtotal),
-      discountTotal: "0.00",
+      discountTotal: formatMinorUnits(discountTotal + couponDiscountTotal),
+      productDiscountTotal: formatMinorUnits(discountTotal),
+      couponDiscountTotal: formatMinorUnits(couponDiscountTotal),
+      couponCode: couponResult?.coupon.code ?? null,
       deliveryCharge: formatMinorUnits(deliveryCharge),
       grandTotal: formatMinorUnits(grandTotal),
       currency: CURRENCY,
@@ -629,6 +687,20 @@ export async function checkout(userId: string, input: CheckoutInput) {
     });
 
     await orderRepository.save(order);
+
+    if (couponResult) {
+      couponResult.coupon.usedCount += 1;
+      await manager.getRepository(Coupon).save(couponResult.coupon);
+      await manager.getRepository(CouponRedemption).save(
+        manager.getRepository(CouponRedemption).create({
+          couponId: couponResult.coupon.id,
+          userId,
+          orderId: order.id,
+          codeSnapshot: couponResult.coupon.code,
+          discountAmount: formatCouponMoney(couponDiscountTotal),
+        }),
+      );
+    }
 
     const orderItems = preparedItems.map(({ cartItem, variant, unitPrice, lineTotal }) =>
       manager.getRepository(OrderItem).create({

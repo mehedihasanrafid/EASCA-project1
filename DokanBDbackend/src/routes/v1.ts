@@ -25,6 +25,7 @@ import {
   adminProductTypeAttributeRouter,
 } from "../modules/attributes/product-attribute.routes.js";
 import { adminDashboardRouter } from "../modules/admin-dashboard/admin-dashboard.routes.js";
+import { adminCouponRouter } from "../modules/coupons/coupon.routes.js";
 
 export const v1Router = Router();
 
@@ -43,5 +44,6 @@ v1Router.use("/admin/product-types", adminProductTypeAttributeRouter);
 v1Router.use("/admin/attributes", adminProductAttributeRouter);
 v1Router.use("/admin/products", adminProductRouter);
 v1Router.use("/admin/dashboard", adminDashboardRouter);
+v1Router.use("/admin/coupons", adminCouponRouter);
 v1Router.use("/orders", orderRouter);
 v1Router.use("/admin/orders", adminOrderRouter);

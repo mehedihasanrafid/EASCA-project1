@@ -14,8 +14,8 @@ describe("OpenAPI documentation", () => {
       0,
     );
 
-    expect(Object.keys(paths)).toHaveLength(59);
-    expect(operationCount).toBe(80);
+    expect(Object.keys(paths)).toHaveLength(64);
+    expect(operationCount).toBe(88);
   });
 
   it("marks protected and administrator operations with bearer security", () => {
@@ -40,7 +40,7 @@ describe("OpenAPI documentation", () => {
     expect(components.ProductMediaListResponse).toBeDefined();
   });
 
-  it("documents product properties, type assignments, and bulk variants", () => {
+  it("documents product attributes, type assignments, and bulk variants", () => {
     const components = openApiDocument.components.schemas as Record<string, unknown>;
     expect(paths["/admin/attributes"]?.get).toBeDefined();
     expect(paths["/admin/attributes/{id}/values"]?.post).toBeDefined();
@@ -48,6 +48,16 @@ describe("OpenAPI documentation", () => {
     expect(paths["/admin/products/{productId}/variants/bulk"]?.post).toBeDefined();
     expect(components.AdminAttribute).toBeDefined();
     expect(components.BulkProductVariantRequest).toBeDefined();
+  });
+
+  it("documents direct category-to-type assignments and global brands", () => {
+    const components = openApiDocument.components.schemas as Record<string, unknown>;
+
+    expect(paths["/admin/categories/{id}/product-types"]?.get).toBeDefined();
+    expect(paths["/admin/categories/{id}/product-types"]?.put).toBeDefined();
+    expect(paths["/admin/product-types/{id}/brands"]).toBeUndefined();
+    expect(components.SetCategoryProductTypesRequest).toBeDefined();
+    expect(components.ProductTypeBrandAssignmentResponse).toBeUndefined();
   });
 
   it("documents the protected administrator dashboard analytics", () => {
@@ -123,10 +133,25 @@ describe("OpenAPI documentation", () => {
   });
 
   it("documents the complete cart response", () => {
-    const components = openApiDocument.components.schemas as Record<string, unknown>;
+    const components = openApiDocument.components.schemas as Record<string, any>;
 
     expect(components.Cart).toBeDefined();
     expect(components.CartResponse).toBeDefined();
+    expect(components.Cart.properties.items.items.required).toEqual(expect.arrayContaining([
+      "regularUnitPrice",
+      "baseUnitPrice",
+      "unitPrice",
+      "savingsTotal",
+      "pricing",
+    ]));
+    expect(components.Cart.properties.totals.required).toEqual(expect.arrayContaining([
+      "regularSubtotal",
+      "subtotal",
+      "savingsTotal",
+    ]));
+    expect(
+      components.Cart.properties.items.items.properties.productVariant.required,
+    ).toContain("optionValues");
     expect(paths["/cart"]?.get?.responses).toMatchObject({
       "200": {
         content: {
@@ -138,6 +163,17 @@ describe("OpenAPI documentation", () => {
     });
   });
 
+  it("documents coupon administration and checkout application", () => {
+    const components = openApiDocument.components.schemas as Record<string, any>;
+    expect(components.Coupon).toBeDefined();
+    expect(components.AdminCouponListResponse).toBeDefined();
+    expect(paths["/admin/coupons"]?.get?.security).toEqual([{ bearerAuth: [] }]);
+    expect(paths["/admin/coupons"]?.post?.requestBody).toBeDefined();
+    expect(components.CheckoutPreview.required).toEqual(expect.arrayContaining([
+      "productDiscountTotal", "couponDiscountTotal", "couponCode",
+    ]));
+  });
+
   it("documents address management and checkout responses", () => {
     const components = openApiDocument.components.schemas as Record<string, unknown>;
 
@@ -147,6 +183,13 @@ describe("OpenAPI documentation", () => {
     expect(components.OrderResponse).toBeDefined();
     expect(components.OrderListResponse).toBeDefined();
     expect(components.CheckoutPreviewResponse).toBeDefined();
+    expect((components.CheckoutPreview as any).required).toEqual(expect.arrayContaining([
+      "items",
+      "regularSubtotal",
+      "discountTotal",
+      "deliveryCharge",
+      "grandTotal",
+    ]));
     expect(paths["/addresses"]?.get?.responses).toMatchObject({
       "200": {
         content: {

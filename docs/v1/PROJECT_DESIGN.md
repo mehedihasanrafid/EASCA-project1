@@ -196,11 +196,11 @@ Product details, descriptions, media, attributes, variants, pricing, publication
 
 ### Categories
 
-Hierarchical catalog navigation, category visibility, display order, and product assignment rules.
+Hierarchical catalog navigation, category visibility, display order, and product assignment rules. Parent-child placement is independent from product-type assignment: each category explicitly owns its allowed reusable types. A category marked `allowProducts = false` is a grouping node, while a product-assignable category must use one of its direct type assignments. Parent storefront filters include active descendants. Parent cycles and unsafe archive operations are rejected.
 
 ### Brands
 
-Brand identity, descriptions, logos, status, and product association.
+Global optional brand identity, descriptions, logos, status, and product association. Brands are selected directly on products and are not restricted by category or product type.
 
 ### Vendors
 
@@ -229,6 +229,30 @@ Return eligibility, requests, item inspection, approval or rejection, refund coo
 ### Admin
 
 Moderation, dashboard data, operational controls, configuration, reports, and audit-log access.
+
+The implemented web administration shell uses a reusable sidebar component:
+
+- `web/src/admin/navigation/AdminSidebar/` is the self-contained sidebar module. Its configuration, types, route utilities, state hook, subcomponents, CSS Module, tests, and public exports are kept together;
+- `adminSidebar.config.ts` is the single place for adding, removing, or reordering administrator navigation destinations;
+- `web/src/layouts/AdminLayout.tsx` composes the sidebar with the selected admin route through React Router's `Outlet`, while `AdminLayout.module.css` supplies admin-only tokens and independent workspace scrolling;
+- `AdminSidebar.module.css` controls the 248-pixel full sidebar, 76-pixel icon-only sidebar, modern slate/blue theme, sticky viewport height, transitions, and horizontal mobile navigation without adding sidebar rules to the global admin stylesheet;
+- `web/src/layouts/MainLayout.tsx` selects a header by URL: `/admin/*` uses the administrator header, while storefront, cart, checkout, and customer-account routes share the storefront header;
+- `web/src/admin/layout/AdminHeader/` owns the administrator header component, user controls, and isolated CSS Module. Product search intentionally belongs to the Products page rather than the global header;
+- `web/src/admin/products/AdminProductsPage.tsx` owns admin catalog search, stores the submitted term in the `search` URL parameter, and reloads through `adminProductApi.getProducts`. The backend matches product name, slug, SKU, category, and brand;
+- `web/src/features/storefront/StorefrontHeader.tsx` and its CSS Module own the shared public/customer header, compact sticky product search, cart, account, authentication, and administrator return link. Large homepage/catalog searches hand off to the compact header search when scrolled beneath it;
+- `web/src/features/storefront/StorefrontSecondaryBar.tsx` is an optional second-header extension point for future promotions, categories, brands, and campaign links. It renders nothing until content is supplied;
+- global tokens remain the customer/storefront theme. The admin shell overrides tokens only inside its own layout, so Tailwind utilities, global tokens, and component CSS Modules can safely be used together;
+
+The incremental frontend organization standard and migration order are
+documented in `docs/v1/FRONTEND_STRUCTURE.md`. Admin Products is the first
+reference feature using a thin page, named components, a workflow hook, and
+colocated component CSS.
+
+The Admin Dashboard implementation and full frontend-to-database workflow are
+documented in `docs/v1/ADMIN_DASHBOARD_REFERENCE.md`.
+- the collapsed preference is stored in browser local storage as `dokanbd.admin.sidebar.collapsed`.
+
+Add future admin destinations to `adminSidebarSections` rather than writing new navigation markup. Every visible destination must also have a protected route in `AppRouter.tsx`; hiding a link is not authorization, so its backend route must continue to use authentication and the `ADMIN`/`OWNER` role middleware.
 
 ### Payments
 
@@ -453,4 +477,3 @@ These items are intentionally outside the initial foundation unless later requir
 - Production hosting, storage, email, and SMS providers
 
 This document is the Version 1 design baseline. Detailed requirements, database definitions, API contracts, diagrams, test cases, and deployment procedures should be added to their dedicated documentation folders as implementation decisions are approved.
-

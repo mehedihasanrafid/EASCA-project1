@@ -1,0 +1,61 @@
+.form {
+  width: min(100%, 34rem);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem;
+  padding-left: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  color: var(--text-muted);
+  background: #f8fafc;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.form:focus-within {
+  border-color: var(--admin-accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px rgb(59 130 246 / 12%);
+}
+
+.form input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  color: var(--text-main);
+  background: transparent;
+  font: inherit;
+}
+
+.clearButton {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0.45rem;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.clearButton:hover {
+  color: var(--text-main);
+  background: var(--bg-color);
+}
+
+.submitButton {
+  width: auto;
+  min-height: 2.35rem;
+  flex: 0 0 auto;
+  padding: 0.55rem 1rem;
+}
+
+@media (max-width: 600px) {
+  .form {
+    width: 100%;
+  }
+}

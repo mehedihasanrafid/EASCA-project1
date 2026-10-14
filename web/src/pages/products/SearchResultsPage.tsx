@@ -36,7 +36,7 @@ export const SearchResultsPage: React.FC = () => {
           </Link>
           <p className="m-0 text-center text-sm font-bold tracking-[0.14em] text-white/80 uppercase">Product discovery</p>
           <h1 className="mt-2 mb-7 text-center text-[clamp(2rem,5vw,3.25rem)] leading-tight text-white">Find your next product</h1>
-          <ProductSearch initialValue={filters.search ?? ""} />
+          <ProductSearch initialValue={filters.search ?? ""} stickySource />
         </div>
       </section>
 

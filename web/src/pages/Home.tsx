@@ -48,7 +48,7 @@ export const Home: React.FC = () => {
       <div className="hero-section">
         <h1>Welcome to DokanBD</h1>
         <p>Discover premium products at unbeatable prices.</p>
-        <ProductSearch className="mt-8" />
+        <ProductSearch className="mt-8" stickySource />
       </div>
 
       <CategoryNavigation

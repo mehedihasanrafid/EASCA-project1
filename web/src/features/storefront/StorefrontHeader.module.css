@@ -1,0 +1,177 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.content {
+  width: 100%;
+  max-width: 1200px;
+  display: grid;
+  grid-template-columns: auto minmax(12rem, 1fr) auto;
+  align-items: center;
+  gap: clamp(0.75rem, 2vw, 1.5rem);
+  margin: 0 auto;
+  padding: 1rem 2rem;
+}
+
+.logo {
+  color: var(--primary);
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.searchSlot {
+  width: min(100%, 34rem);
+  min-width: 0;
+  justify-self: center;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.searchVisible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.searchHidden {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-0.35rem);
+}
+
+.actions,
+.authLinks,
+.userMenu {
+  display: flex;
+  align-items: center;
+}
+
+.actions {
+  grid-column: 3;
+  justify-self: end;
+}
+
+.authLinks,
+.userMenu {
+  gap: 1rem;
+}
+
+.accountLink,
+.cartLink {
+  gap: 0.45rem;
+  white-space: nowrap;
+}
+
+.cartLink {
+  position: relative;
+  padding-inline: 0.85rem;
+}
+
+.cartBadge {
+  position: absolute;
+  top: 0.15rem;
+  right: 0.15rem;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  display: grid;
+  place-items: center;
+  padding: 0 0.25rem;
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  color: #fff;
+  background: var(--error);
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.userInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.userName {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.roleBadge {
+  padding: 0.1rem 0.4rem;
+  border-radius: 1rem;
+  color: var(--text-muted);
+  background: var(--bg-color);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 900px) {
+  .userInfo {
+    display: none;
+  }
+
+  .authLinks,
+  .userMenu {
+    gap: 0.45rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .content {
+    grid-template-columns: auto 1fr;
+    gap: 0.7rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .actions {
+    grid-column: 2;
+  }
+
+  .searchSlot {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+  }
+
+  .searchHidden {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .content {
+    padding: 0.7rem 1rem;
+  }
+
+  .userMenu {
+    gap: 0.35rem;
+  }
+
+  .userInfo {
+    display: none;
+  }
+
+  .accountLink,
+  .cartLink {
+    padding: 0.65rem;
+  }
+
+  .accountLink span,
+  .actionLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}

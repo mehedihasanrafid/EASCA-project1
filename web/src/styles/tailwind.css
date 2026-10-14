@@ -12,6 +12,7 @@
 @import "./components/feedback.css" layer(legacy);
 @import "./features/dashboard.css" layer(legacy);
 @import "./features/admin.css" layer(legacy);
+@import "./features/product-editor.css" layer(legacy);
 @import "./components/states.css" layer(legacy);
 @import "./features/storefront.css" layer(legacy);
 @import "./features/product.css" layer(legacy);

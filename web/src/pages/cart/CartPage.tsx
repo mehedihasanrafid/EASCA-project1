@@ -1,6 +1,7 @@
 import React from "react";
 import {
   ArrowLeft,
+  BadgePercent,
   Minus,
   PackageOpen,
   Plus,
@@ -21,6 +22,12 @@ const priceFormatter = new Intl.NumberFormat("en-BD", {
 });
 
 function variantDescription(item: CartItem) {
+  if (item.productVariant.optionValues.length > 0) {
+    return item.productVariant.optionValues
+      .map((value) => `${value.attribute.name}: ${value.label}`)
+      .join(" · ");
+  }
+
   return [
     item.productVariant.variantName,
     item.productVariant.color,
@@ -182,6 +189,17 @@ export const CartPage: React.FC = () => {
                 <div className="cart-item-price">
                   <strong>{priceFormatter.format(Number(item.lineTotal))}</strong>
                   <span>{priceFormatter.format(Number(item.unitPrice))} each</span>
+                  {Number(item.regularUnitPrice) > Number(item.unitPrice) && (
+                    <del>{priceFormatter.format(Number(item.regularUnitPrice))} each</del>
+                  )}
+                  {item.pricing.source === "QUANTITY_TIER" && (
+                    <small className="cart-pricing-badge">
+                      <BadgePercent size={13} /> {item.pricing.minimumQuantity}+ quantity price
+                    </small>
+                  )}
+                  {item.pricing.source === "DISCOUNT" && (
+                    <small className="cart-pricing-badge"><BadgePercent size={13} /> Sale price</small>
+                  )}
                 </div>
               </article>
             );
@@ -194,6 +212,12 @@ export const CartPage: React.FC = () => {
             <span>Items ({cart.totals.totalQuantity})</span>
             <strong>{priceFormatter.format(Number(cart.totals.subtotal))}</strong>
           </div>
+          {Number(cart.totals.savingsTotal) > 0 && (
+            <div className="cart-summary-row cart-summary-savings">
+              <span>Your savings</span>
+              <strong>−{priceFormatter.format(Number(cart.totals.savingsTotal))}</strong>
+            </div>
+          )}
           <div className="cart-summary-row">
             <span>Delivery</span>
             <span>Calculated at checkout</span>

@@ -186,6 +186,20 @@
   font-size: 0.78rem;
 }
 
+.cart-item-price del {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.cart-pricing-badge {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.25rem;
+  color: var(--success, #067647);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
 .cart-summary {
   position: sticky;
   top: 96px;
@@ -216,6 +230,11 @@
 
 .cart-summary-row strong {
   color: var(--text-main);
+}
+
+.cart-summary-savings,
+.cart-summary-savings strong {
+  color: var(--success, #067647);
 }
 
 .cart-summary-total {
@@ -344,4 +363,3 @@
     flex-direction: column;
   }
 }
-

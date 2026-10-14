@@ -21,11 +21,12 @@ import { AdminOrderDetailPage } from "../pages/admin/AdminOrderDetailPage";
 import { AdminLayout } from "../layouts/AdminLayout";
 import { AdminBrandsPage } from "../pages/admin/AdminBrandsPage";
 import { AdminCategoriesPage } from "../pages/admin/AdminCategoriesPage";
-import { AdminOverviewPage } from "../pages/admin/AdminOverviewPage";
-import { AdminProductEditorPage } from "../pages/admin/AdminProductEditorPage";
-import { AdminProductsPage } from "../pages/admin/AdminProductsPage";
+import { AdminDashboardPage } from "../admin/dashboard";
+import { AdminProductEditorPage } from "../admin/product-editor";
+import { AdminProductsPage } from "../admin/products";
 import { AdminProductTypesPage } from "../pages/admin/AdminProductTypesPage";
-import { AdminPropertiesPage } from "../pages/admin/AdminPropertiesPage";
+import { AdminAttributesPage } from "../admin/attributes";
+import { AdminCouponsPage } from "../pages/admin/AdminCouponsPage";
 
 const ProtectedRoute: React.FC = () => {
   const { user, loading } = useAuth();
@@ -121,7 +122,7 @@ export const AppRouter: React.FC = () => {
           {/* Protected Admin Routes */}
           <Route element={<RoleRoute roles={["ADMIN", "OWNER"]} />}>
             <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<AdminOverviewPage />} />
+              <Route index element={<AdminDashboardPage />} />
               <Route path="products" element={<AdminProductsPage />} />
               <Route path="products/new" element={<AdminProductEditorPage />} />
               <Route path="products/:productId/edit" element={<AdminProductEditorPage />} />
@@ -130,7 +131,9 @@ export const AppRouter: React.FC = () => {
               <Route path="categories" element={<AdminCategoriesPage />} />
               <Route path="brands" element={<AdminBrandsPage />} />
               <Route path="product-types" element={<AdminProductTypesPage />} />
-              <Route path="properties" element={<AdminPropertiesPage />} />
+              <Route path="attributes" element={<AdminAttributesPage />} />
+              <Route path="properties" element={<Navigate to="/admin/attributes" replace />} />
+              <Route path="coupons" element={<AdminCouponsPage />} />
               <Route path="catalog" element={<Navigate to="/admin/categories" replace />} />
             </Route>
           </Route>

@@ -1,0 +1,30 @@
+/* Only preference-layout styles go here. Existing pricing/media controls keep their styles. */
+.root { display: grid; gap: 0.75rem; min-width: 0; }
+.heading { margin: 0; font-size: 1.05rem; font-weight: 700; }
+.tableScroll { min-width: 0; overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 0.75rem; background: #fff; }
+.table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.table thead { background: #f8fafc; }
+.table thead th { font-size: 0.76rem; font-weight: 700; text-align: center; color: #475569; padding: 0.7rem 0.35rem; }
+.table thead th:first-child { width: 46%; text-align: left; padding-left: 0.9rem; }
+.table thead th:nth-child(2), .table thead th:nth-child(3) { width: 27%; }
+.choiceRow { border-top: 1px solid #e2e8f0; }
+.nameCell { padding: 0.85rem 0.5rem 0.75rem 0.9rem; text-align: left; vertical-align: middle; font-weight: normal; }
+.preferenceName { display: block; font-size: 0.9rem; font-weight: 650; color: #172033; }
+.summary { display: block; margin-top: 0.22rem; font-size: 0.76rem; color: #64748b; line-height: 1.35; }
+.checkCell { text-align: center; vertical-align: middle; padding: 0.5rem 0.25rem; }
+.checkCell input { cursor: pointer; width: 1.08rem; height: 1.08rem; accent-color: #2563eb; }
+.expandButton { display: inline-flex; align-items: center; gap: 0.18rem; margin-top: 0.34rem; padding: 0; border: 0; background: transparent; color: #1d4ed8; font-size: 0.73rem; cursor: pointer; }
+.expandButton:hover { text-decoration: underline; }
+.detailRow { background: #f8fafc; border-top: 1px solid #e2e8f0; }
+.detailRow > td { padding: 0; }
+.detailContent { padding: 0.8rem 0.85rem 1rem; min-width: 0; overflow-wrap: anywhere; }
+.note { margin: 0 0 0.6rem; font-size: 0.8rem; line-height: 1.45; color: #475569; }
+.completeness { margin: 0 0 0.5rem; padding: 0.65rem 0.75rem; border-radius: 0.4rem; background: #eff6ff; color: #1e40af; font-size: 0.8rem; }
+.warning { background: #fff7ed; color: #9a3412; }
+@media (max-width: 540px) {
+  .table thead th { font-size: 0.68rem; }
+  .nameCell { padding-left: 0.5rem; }
+  .table thead th:first-child { padding-left: 0.5rem; width: 42%; }
+  .table thead th:nth-child(2), .table thead th:nth-child(3) { width: 29%; }
+  .detailContent { padding: 0.65rem; }
+}

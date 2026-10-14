@@ -120,6 +120,9 @@ export const OrderDetailPage: React.FC = () => {
       <OrderPanel title="Payment summary" icon={<ReceiptText size={20} />}>
         <OrderTotals
           subtotal={order.subtotal}
+          productDiscountTotal={order.productDiscountTotal}
+          couponDiscountTotal={order.couponDiscountTotal}
+          couponCode={order.couponCode}
           deliveryCharge={order.deliveryCharge}
           grandTotal={order.grandTotal}
           paymentStatus={order.paymentStatus}

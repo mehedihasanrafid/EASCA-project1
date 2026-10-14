@@ -1,11 +1,24 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle, ChevronLeft, ChevronRight, Play, ShoppingCart } from "lucide-react";
+import { ArrowLeft, BadgePercent, CheckCircle, ChevronLeft, ChevronRight, Play, ShoppingCart } from "lucide-react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { ApiException } from "../../api/client";
 import { Product, productApi } from "../../api/products";
 import { useAuth } from "../../features/auth/AuthContext";
 import { useCart } from "../../features/cart/CartContext";
+import {
+  changeStorefrontOption,
+  nextStorefrontOptionName,
+  selectionFromVariant,
+  selectionHasTerminalVariant,
+  storefrontOptionValueStates,
+} from "./productVariantSelection";
+import {
+  editableQuantityFromInput,
+  type EditableProductQuantity,
+  purchasableQuantity,
+} from "./productQuantity";
+import { resolveStorefrontPricing, storefrontTierSchedule } from "./storefrontPricing";
 
 const priceFormatter = new Intl.NumberFormat("en-BD", {
   style: "currency",
@@ -23,7 +36,7 @@ export const ProductDetail: React.FC = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState("");
   const [selectedOptionValues, setSelectedOptionValues] = useState<Record<string, string>>({});
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState<EditableProductQuantity>(1);
   const [selectedMediaId, setSelectedMediaId] = useState("");
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -42,11 +55,7 @@ export const ProductDetail: React.FC = () => {
           result.variants?.find((variant) => variant.isDefault && variant.inStock) ??
           result.variants?.find((variant) => variant.inStock);
         setSelectedVariantId(defaultVariant?.id ?? "");
-        setSelectedOptionValues(
-          Object.fromEntries(
-            (defaultVariant?.optionValues ?? []).map((value) => [value.attribute.id, value.id]),
-          ),
-        );
+        setSelectedOptionValues(selectionFromVariant(defaultVariant));
         const initialMedia =
           result.media?.find((item) => item.isPrimary) ?? result.media?.[0];
         setSelectedMediaId(initialMedia?.id ?? "");
@@ -67,6 +76,10 @@ export const ProductDetail: React.FC = () => {
   const selectedVariant = useMemo(
     () => product?.variants?.find((variant) => variant.id === selectedVariantId),
     [product, selectedVariantId],
+  );
+  const resolvedQuantity = purchasableQuantity(
+    quantity,
+    selectedVariant?.stockQuantity ?? 1,
   );
 
   const mediaItems = useMemo(() => {
@@ -98,41 +111,19 @@ export const ProductDetail: React.FC = () => {
 
   const chooseOption = (attributeId: string, valueId: string) => {
     if (!product) return;
-    const next = { ...selectedOptionValues, [attributeId]: valueId };
-    const optionCount = product.options?.length ?? 0;
-    const exactVariant = product.variants?.find((variant) =>
-      variant.optionValues.length === optionCount &&
-      variant.optionValues.every((value) => next[value.attribute.id] === value.id),
+    const result = changeStorefrontOption(
+      product.options ?? [],
+      product.variants ?? [],
+      selectedOptionValues,
+      attributeId,
+      valueId,
     );
-    const compatibleVariant = exactVariant ?? product.variants
-      ?.filter((variant) =>
-        variant.inStock &&
-        variant.optionValues.some((value) => value.attribute.id === attributeId && value.id === valueId),
-      )
-      .sort((left, right) => {
-        const matchingSelections = (variant: typeof left) => variant.optionValues.filter(
-          (value) => value.attribute.id !== attributeId && selectedOptionValues[value.attribute.id] === value.id,
-        ).length;
-        return matchingSelections(right) - matchingSelections(left);
-      })[0];
-
-    if (compatibleVariant) {
-      setSelectedOptionValues(Object.fromEntries(
-        compatibleVariant.optionValues.map((value) => [value.attribute.id, value.id]),
-      ));
-      setSelectedVariantId(compatibleVariant.id);
-    } else {
-      setSelectedOptionValues(next);
-      setSelectedVariantId("");
-    }
+    setSelectedOptionValues(result.selection);
+    setSelectedVariantId(result.variant?.id ?? "");
     setQuantity(1);
+    setError("");
+    setMessage("");
   };
-
-  const optionIsAvailable = (attributeId: string, valueId: string) =>
-    Boolean(product?.variants?.some((variant) =>
-      variant.inStock &&
-      variant.optionValues.some((value) => value.attribute.id === attributeId && value.id === valueId),
-    ));
 
   const handleAddToCart = async () => {
     if (!user) {
@@ -155,8 +146,10 @@ export const ProductDetail: React.FC = () => {
     setMessage("");
 
     try {
-      await addItem(selectedVariant.id, quantity);
-      setMessage(`${quantity} item${quantity === 1 ? "" : "s"} added to your cart.`);
+      // Resolve a temporarily empty input only when the cart needs a real integer.
+      setQuantity(resolvedQuantity);
+      await addItem(selectedVariant.id, resolvedQuantity);
+      setMessage(`${resolvedQuantity} item${resolvedQuantity === 1 ? "" : "s"} added to your cart.`);
     } catch (requestError) {
       setError(
         requestError instanceof ApiException
@@ -182,7 +175,17 @@ export const ProductDetail: React.FC = () => {
     );
   }
 
-  const displayedPrice = selectedVariant?.price ?? product.price;
+  const pricing = selectedVariant
+    ? resolveStorefrontPricing(selectedVariant, resolvedQuantity)
+    : null;
+  const displayedPrice = pricing?.unitPrice ?? Number(product.price);
+  const displayedRegularPrice = pricing?.regularUnitPrice ?? Number(product.regularPrice);
+  const tierSchedule = selectedVariant ? storefrontTierSchedule(selectedVariant) : [];
+  const nextOptionName = nextStorefrontOptionName(
+    product.options ?? [],
+    product.variants ?? [],
+    selectedOptionValues,
+  );
 
   return (
     <div className="product-detail-page">
@@ -244,38 +247,83 @@ export const ProductDetail: React.FC = () => {
         <section className="product-detail-content">
           <p className="product-detail-category">{product.category.name}</p>
           <h1>{product.name}</h1>
-          <p className="product-detail-price">{priceFormatter.format(Number(displayedPrice))}</p>
+          <div className="product-detail-pricing" aria-live="polite">
+            <p className="product-detail-price">{priceFormatter.format(displayedPrice)}</p>
+            {displayedRegularPrice > displayedPrice && (
+              <del>{priceFormatter.format(displayedRegularPrice)}</del>
+            )}
+            {pricing && pricing.discountPercentage > 0 && (
+              <span><BadgePercent size={15} /> Save {pricing.discountPercentage}%</span>
+            )}
+          </div>
+          {pricing?.source === "QUANTITY_TIER" && (
+            <p className="product-active-tier">
+              Quantity price applied for {pricing.tier?.minimumQuantity}+ items.
+            </p>
+          )}
           {product.shortDescription && <p className="product-detail-summary">{product.shortDescription}</p>}
 
           {(product.options?.length ?? 0) > 0 ? (
             <div className="product-option-groups">
-              {product.options?.map((option) => (
-                <fieldset className="product-option-group" key={option.attribute.id}>
-                  <legend>{option.attribute.name}</legend>
-                  <div className="product-option-values">
-                    {option.values.map((value) => {
-                      const selected = selectedOptionValues[option.attribute.id] === value.id;
-                      const available = optionIsAvailable(option.attribute.id, value.id);
-                      return (
-                        <button
-                          key={value.id}
-                          type="button"
-                          className={`product-option-button${selected ? " is-selected" : ""}`}
-                          disabled={!available}
-                          onClick={() => chooseOption(option.attribute.id, value.id)}
-                          aria-pressed={selected}
-                        >
-                          {option.attribute.inputType === "COLOR" && value.colorHex && (
-                            <span className="product-color-swatch" style={{ backgroundColor: value.colorHex }} aria-hidden="true" />
-                          )}
-                          {value.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </fieldset>
-              ))}
-              {!selectedVariant && <p className="product-option-help">Choose one value from every option.</p>}
+              {product.options?.map((option, optionIndex) => {
+                const valueStates = storefrontOptionValueStates(
+                  product.options ?? [],
+                  product.variants ?? [],
+                  selectedOptionValues,
+                  option.attribute.id,
+                );
+                if (valueStates.length === 0) return null;
+
+                const parentSelection = Object.fromEntries(
+                  (product.options ?? []).slice(0, optionIndex).flatMap((parent) => {
+                    const valueId = selectedOptionValues[parent.attribute.id];
+                    return valueId ? [[parent.attribute.id, valueId]] : [];
+                  }),
+                );
+                const optionalAtThisPath = optionIndex > 0 && selectionHasTerminalVariant(
+                  product.variants ?? [],
+                  parentSelection,
+                );
+
+                return (
+                  <fieldset className="product-option-group" key={option.attribute.id}>
+                    <legend>
+                      {option.attribute.name}
+                      {optionalAtThisPath && <span> (optional)</span>}
+                    </legend>
+                    <div className="product-option-values">
+                      {valueStates.map((value) => {
+                        const selected = selectedOptionValues[option.attribute.id] === value.id;
+                        return (
+                          <button
+                            key={value.id}
+                            type="button"
+                            className={`product-option-button${selected ? " is-selected" : ""}${!value.inStock ? " is-sold-out" : ""}`}
+                            disabled={!value.inStock}
+                            onClick={() => chooseOption(option.attribute.id, value.id)}
+                            aria-pressed={selected}
+                            title={!value.inStock ? `${value.label} is sold out for this selection` : undefined}
+                          >
+                            {option.attribute.inputType === "COLOR" && value.colorHex && (
+                              <span className="product-color-swatch" style={{ backgroundColor: value.colorHex }} aria-hidden="true" />
+                            )}
+                            {value.label}
+                            {!value.inStock && <small>Sold out</small>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+                );
+              })}
+              {!selectedVariant && nextOptionName && (
+                <p className="product-option-help">Choose {nextOptionName} to continue.</p>
+              )}
+              {selectedVariant && (
+                <p className="product-option-ready">
+                  <CheckCircle size={16} /> {selectedVariant.sku} is ready to add.
+                </p>
+              )}
             </div>
           ) : (product.variants?.length ?? 0) > 0 && (
             <div className="form-group">
@@ -297,6 +345,40 @@ export const ProductDetail: React.FC = () => {
             </div>
           )}
 
+          {selectedVariant && tierSchedule.length > 0 && (
+            <section className="product-tier-panel" aria-labelledby="quantity-pricing-title">
+              <div>
+                <h2 id="quantity-pricing-title">Buy more, save more</h2>
+                <p>Select a price block to update the quantity.</p>
+              </div>
+              <div className="product-tier-list">
+                {tierSchedule.map((tier) => {
+                  const active = pricing?.tier?.minimumQuantity === tier.minimumQuantity;
+                  const unavailable = tier.minimumQuantity > selectedVariant.stockQuantity;
+                  return (
+                    <button
+                      key={tier.minimumQuantity}
+                      type="button"
+                      className={active ? "is-active" : ""}
+                      disabled={unavailable}
+                      onClick={() => setQuantity(tier.minimumQuantity)}
+                      title={unavailable ? "Not enough stock for this price block" : undefined}
+                    >
+                      <span>{tier.minimumQuantity}+ items</span>
+                      <strong>{priceFormatter.format(tier.unitPrice)} each</strong>
+                      {tier.isPromotion && <small>Promotion</small>}
+                    </button>
+                  );
+                })}
+              </div>
+              {pricing?.nextTier && pricing.nextTier.minimumQuantity <= selectedVariant.stockQuantity && (
+                <p className="product-next-tier">
+                  Add {pricing.nextTier.minimumQuantity - resolvedQuantity} more to unlock {priceFormatter.format(Number(pricing.nextTier.unitPrice))} each.
+                </p>
+              )}
+            </section>
+          )}
+
           <div className="product-purchase-row">
             <div className="form-group quantity-field">
               <label htmlFor="quantity">Quantity</label>
@@ -304,10 +386,16 @@ export const ProductDetail: React.FC = () => {
                 id="quantity"
                 className="form-input"
                 type="number"
+                inputMode="numeric"
                 min={1}
                 max={selectedVariant?.stockQuantity ?? 1}
+                step={1}
                 value={quantity}
-                onChange={(event) => setQuantity(Math.max(1, Number(event.target.value) || 1))}
+                onChange={(event) => setQuantity(editableQuantityFromInput(
+                  event.target.value,
+                  selectedVariant?.stockQuantity ?? 1,
+                ))}
+                onBlur={() => setQuantity(resolvedQuantity)}
               />
             </div>
             <button
@@ -320,6 +408,18 @@ export const ProductDetail: React.FC = () => {
               {adding ? "Adding..." : isAdmin ? "Customer cart only" : user ? "Add to cart" : "Log in to add"}
             </button>
           </div>
+
+          {pricing && (
+            <div className="product-price-preview" aria-live="polite">
+              <span>
+                {resolvedQuantity} × {priceFormatter.format(pricing.unitPrice)}
+              </span>
+              <strong>Total {priceFormatter.format(pricing.lineTotal)}</strong>
+              {pricing.savingsTotal > 0 && (
+                <small>You save {priceFormatter.format(pricing.savingsTotal)}</small>
+              )}
+            </div>
+          )}
 
           {message && <div className="alert alert-success"><CheckCircle size={18} />{message}</div>}
           {error && <div className="alert alert-error">{error}</div>}

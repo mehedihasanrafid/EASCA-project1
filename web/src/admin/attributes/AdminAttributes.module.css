@@ -1,0 +1,215 @@
+.form {
+  align-items: start;
+  background: var(--color-surface-soft, #f8fafc);
+  border: 1px solid var(--color-border, #e1e5ea);
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(12rem, 0.8fr) minmax(18rem, 1.5fr) auto;
+  margin: 1rem 0 1.5rem;
+  padding: 1rem;
+}
+
+.helpText {
+  color: var(--color-text-muted, #667085);
+  display: block;
+  font-size: 0.75rem;
+  margin-top: 0.35rem;
+}
+
+.submitButton {
+  margin-top: 1.42rem;
+  white-space: nowrap;
+}
+
+.editForm {
+  background: var(--color-surface-soft, #f8fafc);
+  border: 1px solid var(--color-border, #e1e5ea);
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 1rem;
+  margin: 1rem 0 1.5rem;
+  padding: 1rem;
+}
+
+.editHeading,
+.editFields,
+.editActions {
+  align-items: center;
+  display: flex;
+}
+
+.editHeading {
+  justify-content: space-between;
+}
+
+.editHeading h3,
+.editHeading p {
+  margin: 0;
+}
+
+.editHeading p {
+  color: var(--color-text-muted, #667085);
+  font-size: 0.82rem;
+  margin-top: 0.2rem;
+}
+
+.editHeading > button {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 0.4rem;
+}
+
+.editFields {
+  align-items: end;
+  gap: 1rem;
+}
+
+.editFields > :first-child {
+  flex: 1;
+}
+
+.editActions {
+  gap: 0.5rem;
+}
+
+.table {
+  table-layout: fixed;
+}
+
+.table th:first-child,
+.table td:first-child {
+  width: 24%;
+}
+
+.table th:nth-child(3),
+.table td:nth-child(3) {
+  width: 8rem;
+}
+
+.table th:last-child,
+.table td:last-child {
+  width: 7rem;
+}
+
+.values {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.valueManager {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.valueList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.valueChip {
+  align-items: center;
+  background: #eef5ff;
+  border: 1px solid #d7e6fb;
+  border-radius: 999px;
+  color: #27476e;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 650;
+  gap: 0.25rem;
+  padding: 0.24rem 0.36rem 0.24rem 0.58rem;
+}
+
+.valueChip button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  color: currentColor;
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+  padding: 0.12rem;
+}
+
+.valueChip button:hover:not(:disabled) {
+  background: rgb(39 71 110 / 12%);
+}
+
+.valueChip button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.removedValue {
+  background: #f4f4f5;
+  border-color: #e4e4e7;
+  color: #71717a;
+  text-decoration: line-through;
+}
+
+.noValues {
+  color: var(--color-text-muted, #667085);
+  font-size: 0.82rem;
+}
+
+.valueForm {
+  align-items: center;
+  display: flex;
+  gap: 0.4rem;
+  max-width: 22rem;
+}
+
+.valueForm input {
+  min-width: 7rem;
+  padding-block: 0.48rem;
+}
+
+.valueForm button {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--color-border, #d7dce2);
+  border-radius: 0.5rem;
+  color: var(--primary, #176b45);
+  cursor: pointer;
+  display: inline-flex;
+  font-weight: 700;
+  gap: 0.25rem;
+  padding: 0.48rem 0.65rem;
+  white-space: nowrap;
+}
+
+.valueForm button:hover:not(:disabled) {
+  background: var(--success-bg, #eef8f2);
+}
+
+.valueForm button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+@media (max-width: 760px) {
+  .form {
+    grid-template-columns: 1fr;
+  }
+
+  .submitButton {
+    margin-top: 0;
+    width: 100%;
+  }
+
+  .editFields {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .editActions .btn {
+    flex: 1;
+  }
+
+  .table {
+    min-width: 680px;
+  }
+}

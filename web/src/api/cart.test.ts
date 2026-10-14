@@ -13,7 +13,9 @@ const cart = {
   totals: {
     itemCount: 0,
     totalQuantity: 0,
+    regularSubtotal: "0.00",
     subtotal: "0.00",
+    savingsTotal: "0.00",
     currency: "BDT",
   },
   createdAt: "2026-10-07T00:00:00.000Z",

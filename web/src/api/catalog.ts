@@ -8,6 +8,7 @@ export interface CategoryOption extends ProductTaxonomy {
   displayImageUrl: string | null;
   productCount: number;
   sortOrder: number;
+  allowProducts: boolean;
   showOnHomepage: boolean;
   children: CategoryOption[];
 }

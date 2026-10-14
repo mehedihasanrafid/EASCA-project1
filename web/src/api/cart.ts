@@ -3,8 +3,16 @@ import { apiClient } from "./client";
 export interface CartItem {
   id: string;
   quantity: number;
+  regularUnitPrice: string;
+  baseUnitPrice: string;
   unitPrice: string;
   lineTotal: string;
+  savingsTotal: string;
+  pricing: {
+    source: "REGULAR" | "DISCOUNT" | "QUANTITY_TIER";
+    minimumQuantity: number | null;
+    isPromotion: boolean;
+  };
   available: boolean;
   productVariant: {
     id: string;
@@ -14,6 +22,18 @@ export interface CartItem {
     color: string | null;
     size: string | null;
     stockQuantity: number;
+    optionValues: Array<{
+      id: string;
+      label: string;
+      code: string;
+      colorHex: string | null;
+      attribute: {
+        id: string;
+        name: string;
+        code: string;
+        inputType: "SELECT" | "COLOR" | "TEXT";
+      };
+    }>;
   };
   product: {
     id: string;
@@ -36,7 +56,9 @@ export interface Cart {
   totals: {
     itemCount: number;
     totalQuantity: number;
+    regularSubtotal: string;
     subtotal: string;
+    savingsTotal: string;
     currency: string;
   };
   createdAt: string;

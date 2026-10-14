@@ -8,6 +8,7 @@ import type { CatalogFilters as CatalogFilterValues } from "../types/catalog";
 import { ActiveFilterChips } from "./ActiveFilterChips";
 import { CatalogFilters } from "./CatalogFilters";
 import { CategoryNavigation } from "./CategoryNavigation";
+import { ProductSearch } from "./ProductSearch";
 
 const categories: CategoryOption[] = [
   {
@@ -20,6 +21,7 @@ const categories: CategoryOption[] = [
     displayImageUrl: "/uploads/products/sunglasses.webp",
     productCount: 3,
     sortOrder: 1,
+    allowProducts: true,
     showOnHomepage: true,
     children: [],
   },
@@ -88,5 +90,17 @@ describe("catalog discovery components", () => {
     expect(html).toContain("3 products");
     expect(html).toContain("Previous category");
     expect(html).toContain("Next category");
+  });
+
+  it("renders compact and sticky-source search variants", () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <ProductSearch stickySource variant="compact" />
+      </MemoryRouter>,
+    );
+
+    expect(html).toContain('data-header-search-source="true"');
+    expect(html).toContain('data-search-variant="compact"');
+    expect(html).toContain("Search products");
   });
 });

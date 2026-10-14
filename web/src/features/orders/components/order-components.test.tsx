@@ -49,15 +49,20 @@ describe("shared order components", () => {
     const html = renderToStaticMarkup(
       <OrderTotals
         subtotal="1999.00"
+        productDiscountTotal="201.00"
+        couponDiscountTotal="100.00"
+        couponCode="SAVE100"
         deliveryCharge="60.00"
-        grandTotal="2059.00"
+        grandTotal="1959.00"
         paymentStatus="PENDING"
       />,
     );
 
-    expect(html).toContain("Subtotal");
+    expect(html).toContain("Discounted subtotal");
+    expect(html).toContain("Product savings");
+    expect(html).toContain("Coupon (SAVE100)");
     expect(html).toContain("COD total");
-    expect(html).toContain("2,059");
+    expect(html).toContain("1,959");
     expect(html).toContain("Payment status");
   });
 });

@@ -11,6 +11,9 @@ export interface OrderBase {
   paymentStatus: PaymentStatus;
   subtotal: string;
   discountTotal: string;
+  productDiscountTotal: string;
+  couponDiscountTotal: string;
+  couponCode: string | null;
   deliveryCharge: string;
   grandTotal: string;
   currency: string;
@@ -95,7 +98,29 @@ export interface OrderPagination {
 export interface CheckoutPreview {
   addressId: string;
   isInsideDhaka: boolean;
+  itemCount: number;
+  totalQuantity: number;
+  items: Array<{
+    id: string;
+    productName: string;
+    variantLabel: string | null;
+    sku: string;
+    quantity: number;
+    regularUnitPrice: string;
+    unitPrice: string;
+    lineTotal: string;
+    savingsTotal: string;
+    pricing: {
+      source: "REGULAR" | "DISCOUNT" | "QUANTITY_TIER";
+      minimumQuantity: number | null;
+      isPromotion: boolean;
+    };
+  }>;
+  regularSubtotal: string;
   subtotal: string;
+  productDiscountTotal: string;
+  couponDiscountTotal: string;
+  couponCode: string | null;
   discountTotal: string;
   deliveryCharge: string;
   grandTotal: string;
@@ -104,18 +129,24 @@ export interface CheckoutPreview {
 }
 
 export const orderApi = {
-  previewCheckout: (addressId: string) =>
+  previewCheckout: (addressId: string, couponCode?: string) => {
+    const query = new URLSearchParams({ addressId });
+    if (couponCode?.trim()) query.set("couponCode", couponCode.trim().toUpperCase());
+    return (
     apiClient<{ preview: CheckoutPreview }>(
-      `/orders/checkout-preview?addressId=${encodeURIComponent(addressId)}`,
+      `/orders/checkout-preview?${query.toString()}`,
       { method: "GET" },
-    ).then(({ preview }) => preview),
+    ).then(({ preview }) => preview)
+    );
+  },
 
-  checkout: (addressId: string, customerNote?: string) =>
+  checkout: (addressId: string, customerNote?: string, couponCode?: string) =>
     apiClient<{ order: Order }>("/orders/checkout", {
       method: "POST",
       body: JSON.stringify({
         addressId,
         customerNote: customerNote?.trim() || undefined,
+        couponCode: couponCode?.trim().toUpperCase() || undefined,
       }),
     }).then(({ order }) => order),
 

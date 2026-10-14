@@ -21,12 +21,30 @@ export interface ProductVariant {
   color: string | null;
   size: string | null;
   price: Money;
+  regularPrice?: Money;
+  discountPrice?: Money | null;
+  discountStartsAt?: string | null;
+  discountEndsAt?: string | null;
   stockQuantity: number;
   inStock: boolean;
   weight: Money | null;
+  lengthCm?: Money | null;
+  widthCm?: Money | null;
+  heightCm?: Money | null;
   isDefault: boolean;
   optionValues: ProductOptionValue[];
   costPrice?: Money | null;
+  isActive?: boolean;
+  lowStockLevel?: number;
+  priceTiers?: ProductPriceTier[];
+}
+
+export interface ProductPriceTier {
+  id: string;
+  variantId: string | null;
+  minimumQuantity: number;
+  unitPrice: Money;
+  isPromotion: boolean;
   isActive?: boolean;
 }
 
@@ -65,6 +83,8 @@ export interface Product {
   price: Money;
   regularPrice: Money;
   discountPrice: Money | null;
+  discountStartsAt?: string | null;
+  discountEndsAt?: string | null;
   isFeatured: boolean;
   category: ProductTaxonomy;
   productType: ProductTaxonomy;
@@ -75,6 +95,7 @@ export interface Product {
   variants?: ProductVariant[];
   options?: ProductOption[];
   media?: ProductMedia[];
+  priceTiers?: ProductPriceTier[];
   createdAt: string;
   updatedAt: string;
 }

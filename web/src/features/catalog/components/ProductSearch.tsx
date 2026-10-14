@@ -5,11 +5,17 @@ import { useNavigate } from "react-router-dom";
 import { ProductSuggestion } from "../../../api/products";
 import { formatProductPrice } from "../utils/formatters";
 import { useProductSuggestions } from "../hooks/useProductSuggestions";
+import {
+  PRODUCT_SEARCH_DRAFT_EVENT,
+  publishProductSearchDraft,
+} from "../../storefront/storefrontSearch";
 
 interface Props {
   className?: string;
   initialValue?: string;
   placeholder?: string;
+  stickySource?: boolean;
+  variant?: "default" | "compact";
 }
 
 interface HighlightedTextProps {
@@ -36,6 +42,8 @@ export const ProductSearch: React.FC<Props> = ({
   className = "",
   initialValue = "",
   placeholder = "Search products, brands, categories or SKU",
+  stickySource = false,
+  variant = "default",
 }) => {
   const navigate = useNavigate();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -46,10 +54,19 @@ export const ProductSearch: React.FC<Props> = ({
   const { suggestions, loading, error } = useProductSuggestions(query);
   const normalizedQuery = query.trim();
   const showDropdown = open && normalizedQuery.length >= 2;
+  const compact = variant === "compact";
 
   useEffect(() => {
     setQuery(initialValue);
   }, [initialValue]);
+
+  useEffect(() => {
+    const synchronizeDraft = (event: Event) => {
+      setQuery((event as CustomEvent<string>).detail);
+    };
+    window.addEventListener(PRODUCT_SEARCH_DRAFT_EVENT, synchronizeDraft);
+    return () => window.removeEventListener(PRODUCT_SEARCH_DRAFT_EVENT, synchronizeDraft);
+  }, []);
 
   useEffect(() => {
     setActiveIndex(-1);
@@ -108,14 +125,23 @@ export const ProductSearch: React.FC<Props> = ({
   };
 
   return (
-    <div className={`relative z-20 mx-auto w-full max-w-2xl ${className}`} ref={rootRef}>
-      <form className="flex items-stretch rounded-card bg-surface p-1.5 shadow-[0_18px_45px_rgba(15,48,30,0.18)] focus-within:ring-4 focus-within:ring-brand/20" onSubmit={submit} role="search">
+    <div
+      className={`relative z-30 w-full ${compact ? "min-w-0 max-w-none" : "mx-auto max-w-2xl"} ${className}`}
+      data-header-search-source={stickySource ? "true" : undefined}
+      data-search-variant={variant}
+      ref={rootRef}
+    >
+      <form
+        className={`flex items-stretch rounded-card border bg-surface focus-within:ring-brand/20 ${compact ? "border-line p-1 shadow-sm focus-within:ring-2" : "border-transparent p-1.5 shadow-[0_18px_45px_rgba(15,48,30,0.18)] focus-within:ring-4"}`}
+        onSubmit={submit}
+        role="search"
+      >
         <label className="sr-only" htmlFor={`${listboxId}-input`}>Search products</label>
-        <Search className="my-auto ml-3 shrink-0 text-muted" aria-hidden="true" size={21} />
+        <Search className={`my-auto shrink-0 text-muted ${compact ? "ml-2" : "ml-3"}`} aria-hidden="true" size={compact ? 18 : 21} />
         <input
           id={`${listboxId}-input`}
           type="search"
-          className="min-w-0 flex-1 border-0 bg-transparent px-3 py-3 text-left text-base text-ink outline-none placeholder:text-muted"
+          className={`min-w-0 flex-1 border-0 bg-transparent text-left text-ink outline-none placeholder:text-muted ${compact ? "px-2.5 py-2 text-sm" : "px-3 py-3 text-base"}`}
           value={query}
           placeholder={placeholder}
           autoComplete="off"
@@ -125,7 +151,9 @@ export const ProductSearch: React.FC<Props> = ({
           aria-expanded={showDropdown}
           aria-activedescendant={activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined}
           onChange={(event) => {
-            setQuery(event.target.value);
+            const nextQuery = event.target.value;
+            setQuery(nextQuery);
+            publishProductSearchDraft(nextQuery);
             setOpen(true);
           }}
           onFocus={() => {
@@ -135,10 +163,10 @@ export const ProductSearch: React.FC<Props> = ({
         />
         <button
           type="submit"
-          className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-control border-0 bg-brand px-5 font-bold text-white transition-colors hover:bg-brand-hover"
+          className={`inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-control border-0 bg-brand font-bold text-white transition-colors hover:bg-brand-hover ${compact ? "px-3" : "px-5"}`}
         >
-          <span className="max-[480px]:sr-only">Search</span>
-          <ArrowRight aria-hidden="true" size={18} />
+          <span className={compact ? "sr-only" : "max-[480px]:sr-only"}>Search</span>
+          <ArrowRight aria-hidden="true" size={compact ? 16 : 18} />
         </button>
       </form>
 

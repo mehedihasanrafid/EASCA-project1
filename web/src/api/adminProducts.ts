@@ -1,5 +1,5 @@
 import { apiClient } from "./client";
-import type { Money, Product, ProductMedia, ProductTaxonomy } from "./products";
+import type { Money, Product, ProductMedia, ProductPriceTier, ProductTaxonomy, ProductVariant } from "./products";
 
 export interface AdminProduct extends Product {
   productTypeId: string;
@@ -13,6 +13,7 @@ export interface AdminProduct extends Product {
 
 export interface CategoryOption extends ProductTaxonomy {
   parentId: string | null;
+  allowProducts: boolean;
   children: CategoryOption[];
 }
 
@@ -36,6 +37,8 @@ export interface CreateProductInput {
   defaultPrice: number;
   defaultCostPrice: number | null;
   discountPrice: number | null;
+  discountStartsAt?: string | null;
+  discountEndsAt?: string | null;
   status: AdminProduct["status"];
   isFeatured: boolean;
   isActive: boolean;
@@ -43,12 +46,21 @@ export interface CreateProductInput {
 
 export interface CreateVariantInput {
   sku: string;
+  barcode?: string | null;
   variantName?: string;
   color?: string;
   size?: string;
   price: number;
+  discountPrice?: number | null;
+  discountStartsAt?: string | null;
+  discountEndsAt?: string | null;
   costPrice: number | null;
   stockQuantity: number;
+  lowStockLevel?: number;
+  weight?: number | null;
+  lengthCm?: number | null;
+  widthCm?: number | null;
+  heightCm?: number | null;
   isDefault: boolean;
   isActive: boolean;
   optionValueIds?: string[];
@@ -59,8 +71,8 @@ export type UpdateVariantInput = Partial<Omit<CreateVariantInput, "isDefault">> 
 };
 
 export const adminProductApi = {
-  getProducts: () =>
-    apiClient<AdminProductList>("/admin/products?limit=100&includeDeleted=false", {
+  getProducts: (search = "") =>
+    apiClient<AdminProductList>(`/admin/products?limit=100&includeDeleted=false${search.trim() ? `&search=${encodeURIComponent(search.trim())}` : ""}`, {
       method: "GET",
     }),
 
@@ -81,16 +93,16 @@ export const adminProductApi = {
     }).then(({ product }) => product),
 
   createVariant: (productId: string, input: CreateVariantInput) =>
-    apiClient(`/admin/products/${productId}/variants`, {
+    apiClient<{ variant: ProductVariant }>(`/admin/products/${productId}/variants`, {
       method: "POST",
       body: JSON.stringify(input),
-    }),
+    }).then(({ variant }) => variant),
 
   createVariantsBulk: (productId: string, variants: CreateVariantInput[]) =>
-    apiClient(`/admin/products/${productId}/variants/bulk`, {
+    apiClient<{ variants: ProductVariant[] }>(`/admin/products/${productId}/variants/bulk`, {
       method: "POST",
       body: JSON.stringify({ variants }),
-    }),
+    }).then(({ variants: created }) => created),
 
   updateVariant: (productId: string, variantId: string, input: UpdateVariantInput) =>
     apiClient(`/admin/products/${productId}/variants/${variantId}`, {
@@ -108,6 +120,20 @@ export const adminProductApi = {
       method: "PATCH",
       body: JSON.stringify(input),
     }).then(({ product }) => product),
+
+  replacePriceTiers: (
+    productId: string,
+    tiers: Array<{
+      variantId: string | null;
+      minimumQuantity: number;
+      unitPrice: number;
+      isPromotion: boolean;
+      isActive: boolean;
+    }>,
+  ) => apiClient<{ priceTiers: ProductPriceTier[] }>(
+    `/admin/products/${productId}/price-tiers`,
+    { method: "PUT", body: JSON.stringify({ tiers }) },
+  ).then(({ priceTiers }) => priceTiers),
 
   uploadMedia: (productId: string, files: File[], altText?: string, variantId?: string) => {
     const body = new FormData();

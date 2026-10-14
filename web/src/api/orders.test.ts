@@ -20,6 +20,23 @@ describe("orderApi", () => {
     );
   });
 
+  it("normalizes a coupon in checkout preview and placement", async () => {
+    apiClient.mockResolvedValue({ preview: { addressId: "3" } });
+    await orderApi.previewCheckout("3", " save10 ");
+    expect(apiClient).toHaveBeenLastCalledWith(
+      "/orders/checkout-preview?addressId=3&couponCode=SAVE10",
+      { method: "GET" },
+    );
+
+    const order = { id: "9" } as Order;
+    apiClient.mockResolvedValue({ order });
+    await orderApi.checkout("3", "Call first", " save10 ");
+    expect(apiClient).toHaveBeenLastCalledWith("/orders/checkout", {
+      method: "POST",
+      body: JSON.stringify({ addressId: "3", customerNote: "Call first", couponCode: "SAVE10" }),
+    });
+  });
+
   it("checks out the active cart with an address and note", async () => {
     const order = { id: "9" } as Order;
     apiClient.mockResolvedValue({ order });

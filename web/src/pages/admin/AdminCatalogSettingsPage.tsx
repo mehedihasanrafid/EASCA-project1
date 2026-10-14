@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import {
+  AdminAttribute,
   AdminBrand,
   AdminCategory,
   AdminProductType,
@@ -22,6 +23,10 @@ import {
   SaveProductTypeInput,
 } from "../../api/adminCatalog";
 import { ApiException } from "../../api/client";
+import {
+  ProductTypeAttributeEditor,
+  type ProductTypeAttributeSelection,
+} from "../../admin/product-types/components/ProductTypeAttributeEditor";
 
 export type AdminCatalogSection = "categories" | "brands" | "product-types";
 
@@ -37,6 +42,7 @@ interface CategoryFormState {
   parentId: string;
   sortOrder: string;
   isActive: boolean;
+  allowProducts: boolean;
   showOnHomepage: boolean;
 }
 
@@ -63,6 +69,7 @@ const emptyCategoryForm: CategoryFormState = {
   parentId: "",
   sortOrder: "0",
   isActive: true,
+  allowProducts: true,
   showOnHomepage: false,
 };
 
@@ -107,6 +114,7 @@ export const AdminCatalogSettingsPage: React.FC<AdminCatalogSettingsPageProps> =
   const [categories, setCategories] = useState<AdminCategory[]>([]);
   const [brands, setBrands] = useState<AdminBrand[]>([]);
   const [productTypes, setProductTypes] = useState<AdminProductType[]>([]);
+  const [attributes, setAttributes] = useState<AdminAttribute[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -120,20 +128,24 @@ export const AdminCatalogSettingsPage: React.FC<AdminCatalogSettingsPageProps> =
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(emptyCategoryForm);
   const [brandForm, setBrandForm] = useState<BrandFormState>(emptyBrandForm);
   const [productTypeForm, setProductTypeForm] = useState<ProductTypeFormState>(emptyProductTypeForm);
+  const [categoryProductTypeIds, setCategoryProductTypeIds] = useState<string[]>([]);
+  const [productTypeAttributes, setProductTypeAttributes] = useState<ProductTypeAttributeSelection[]>([]);
   const copy = pageCopy[section];
 
   const loadReferences = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [categoryResult, brandResult, productTypeResult] = await Promise.all([
+      const [categoryResult, brandResult, productTypeResult, attributeResult] = await Promise.all([
         section === "categories" ? adminCatalogApi.getCategories(true) : Promise.resolve([]),
         section === "brands" ? adminCatalogApi.getBrands(true) : Promise.resolve([]),
-        section === "product-types" ? adminCatalogApi.getProductTypes(true) : Promise.resolve([]),
+        section === "product-types" || section === "categories" ? adminCatalogApi.getProductTypes(true) : Promise.resolve([]),
+        section === "product-types" ? adminCatalogApi.getAttributes(false) : Promise.resolve([]),
       ]);
       setCategories(categoryResult);
       setBrands(brandResult);
       setProductTypes(productTypeResult);
+      setAttributes(attributeResult);
     } catch (requestError) {
       setError(requestMessage(requestError, "Could not load catalog settings."));
     } finally {
@@ -145,11 +157,25 @@ export const AdminCatalogSettingsPage: React.FC<AdminCatalogSettingsPageProps> =
     loadReferences();
   }, [loadReferences]);
 
-  const activeParentOptions = useMemo(
-    () =>
-      categories.filter(
-        (category) => !category.deletedAt && category.isActive && category.id !== editingCategoryId,
-      ),
+  const activeParentOptions = useMemo(() => {
+    const disallowedIds = new Set<string>();
+    if (editingCategoryId) {
+      disallowedIds.add(editingCategoryId);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const category of categories) {
+          if (category.parentId && disallowedIds.has(category.parentId) && !disallowedIds.has(category.id)) {
+            disallowedIds.add(category.id);
+            changed = true;
+          }
+        }
+      }
+    }
+    return categories.filter(
+      (category) => !category.deletedAt && category.isActive && !disallowedIds.has(category.id),
+    );
+  },
     [categories, editingCategoryId],
   );
 
@@ -157,6 +183,7 @@ export const AdminCatalogSettingsPage: React.FC<AdminCatalogSettingsPageProps> =
     setCategoryEditorOpen(false);
     setEditingCategoryId(null);
     setCategoryForm(emptyCategoryForm);
+    setCategoryProductTypeIds([]);
   };
 
   const closeBrandEditor = () => {
@@ -169,6 +196,7 @@ export const AdminCatalogSettingsPage: React.FC<AdminCatalogSettingsPageProps> =
     setProductTypeEditorOpen(false);
     setEditingProductTypeId(null);
     setProductTypeForm(emptyProductTypeForm);
+    setProductTypeAttributes([]);
   };
 
   const startNewCategory = () => {
@@ -176,10 +204,11 @@ export const AdminCatalogSettingsPage: React.FC<AdminCatalogSettingsPageProps> =
     setSuccess("");
     setEditingCategoryId(null);
     setCategoryForm(emptyCategoryForm);
+    setCategoryProductTypeIds([]);
     setCategoryEditorOpen(true);
   };
 
-  const editCategory = (category: AdminCategory) => {
+  const editCategory = async (category: AdminCategory) => {
     setError("");
     setSuccess("");
     setEditingCategoryId(category.id);
@@ -191,9 +220,19 @@ export const AdminCatalogSettingsPage: React.FC<AdminCatalogSettingsPageProps> =
       parentId: category.parentId ?? "",
       sortOrder: String(category.sortOrder),
       isActive: category.isActive,
+      allowProducts: category.allowProducts,
       showOnHomepage: category.showOnHomepage,
     });
     setCategoryEditorOpen(true);
+    setBusy(true);
+    try {
+      const assignment = await adminCatalogApi.getCategoryProductTypes(category.id);
+      setCategoryProductTypeIds(assignment.productTypeIds);
+    } catch (requestError) {
+      setError(requestMessage(requestError, "Could not load this category's product types."));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const saveCategory = async (event: React.FormEvent) => {
@@ -201,6 +240,12 @@ export const AdminCatalogSettingsPage: React.FC<AdminCatalogSettingsPageProps> =
     setBusy(true);
     setError("");
     setSuccess("");
+
+    if (categoryForm.allowProducts && categoryProductTypeIds.length === 0) {
+      setError("Choose at least one product type for this category.");
+      setBusy(false);
+      return;
+    }
 
     const input: SaveCategoryInput = {
       name: categoryForm.name,
@@ -210,17 +255,22 @@ export const AdminCatalogSettingsPage: React.FC<AdminCatalogSettingsPageProps> =
       parentId: categoryForm.parentId || null,
       sortOrder: Number(categoryForm.sortOrder),
       isActive: categoryForm.isActive,
+      allowProducts: categoryForm.allowProducts,
       showOnHomepage: categoryForm.showOnHomepage,
     };
 
     try {
+      let savedCategory: AdminCategory;
       if (editingCategoryId) {
-        await adminCatalogApi.updateCategory(editingCategoryId, input);
-        setSuccess("Category updated.");
+        savedCategory = await adminCatalogApi.updateCategory(editingCategoryId, input);
       } else {
-        await adminCatalogApi.createCategory(input);
-        setSuccess("Category created.");
+        savedCategory = await adminCatalogApi.createCategory(input);
       }
+      await adminCatalogApi.setCategoryProductTypes(
+        savedCategory.id,
+        categoryForm.allowProducts ? categoryProductTypeIds : [],
+      );
+      setSuccess(editingCategoryId ? "Category and product types updated." : "Category created with its product types.");
       closeCategoryEditor();
       await loadReferences();
     } catch (requestError) {
@@ -346,12 +396,14 @@ export const AdminCatalogSettingsPage: React.FC<AdminCatalogSettingsPageProps> =
     setSuccess("");
     setEditingProductTypeId(null);
     setProductTypeForm(emptyProductTypeForm);
+    setProductTypeAttributes([]);
     setProductTypeEditorOpen(true);
   };
 
-  const editProductType = (type: AdminProductType) => {
+  const editProductType = async (type: AdminProductType) => {
     setError("");
     setSuccess("");
+    setBusy(true);
     setEditingProductTypeId(type.id);
     setProductTypeForm({
       name: type.name,
@@ -359,13 +411,29 @@ export const AdminCatalogSettingsPage: React.FC<AdminCatalogSettingsPageProps> =
       description: type.description ?? "",
       isActive: type.isActive,
     });
-    setProductTypeEditorOpen(true);
+    try {
+      // Load the current template before opening the form so a failed request can
+      // never look like an intentionally empty assignment list.
+      const assignedAttributes = await adminCatalogApi.getProductTypeAttributes(type.id);
+      setProductTypeAttributes(assignedAttributes.map(({ attributeId, isRequired }, sortOrder) => ({
+        attributeId,
+        isRequired,
+        sortOrder,
+      })));
+      setProductTypeEditorOpen(true);
+    } catch (requestError) {
+      setEditingProductTypeId(null);
+      setError(requestMessage(requestError, "Could not load this product type's attributes."));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const saveProductType = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
     setError("");
+    let savedProductType: AdminProductType | null = null;
     const input: SaveProductTypeInput = {
       name: productTypeForm.name,
       ...(productTypeForm.slug.trim() ? { slug: productTypeForm.slug.trim() } : {}),
@@ -374,15 +442,24 @@ export const AdminCatalogSettingsPage: React.FC<AdminCatalogSettingsPageProps> =
     };
     try {
       if (editingProductTypeId) {
-        await adminCatalogApi.updateProductType(editingProductTypeId, input);
-        setSuccess("Product type updated.");
+        savedProductType = await adminCatalogApi.updateProductType(editingProductTypeId, input);
       } else {
-        await adminCatalogApi.createProductType(input);
-        setSuccess("Product type created.");
+        savedProductType = await adminCatalogApi.createProductType(input);
       }
+
+      // Product Type details and its attribute template use separate endpoints.
+      // The page presents them as one workflow, while backend safety rules reject
+      // attribute changes that would invalidate existing SKU variants.
+      await adminCatalogApi.setProductTypeAttributes(savedProductType.id, productTypeAttributes);
+      setSuccess(editingProductTypeId
+        ? "Product type and attributes updated."
+        : "Product type created with its attribute template. Assign it to a category when needed.");
       closeProductTypeEditor();
       await loadReferences();
     } catch (requestError) {
+      // If creation succeeded but assignment failed, turn the open form into an
+      // edit form. A retry will update the new record instead of creating a duplicate.
+      if (!editingProductTypeId && savedProductType) setEditingProductTypeId(savedProductType.id);
       setError(requestMessage(requestError, "Could not save the product type."));
     } finally {
       setBusy(false);
@@ -456,9 +533,17 @@ export const AdminCatalogSettingsPage: React.FC<AdminCatalogSettingsPageProps> =
                 <div className="form-group"><label htmlFor="category-order">Display order</label><input id="category-order" className="form-input" type="number" min="0" step="1" value={categoryForm.sortOrder} onChange={(event) => setCategoryForm((current) => ({ ...current, sortOrder: event.target.value }))} required /></div>
                 <div className="form-group admin-reference-field-wide"><label htmlFor="category-image">Image URL</label><input id="category-image" className="form-input" type="url" value={categoryForm.imageUrl} onChange={(event) => setCategoryForm((current) => ({ ...current, imageUrl: event.target.value }))} placeholder="https://example.com/category.webp" /></div>
                 <div className="form-group admin-reference-field-wide"><label htmlFor="category-description">Description</label><textarea id="category-description" className="form-input admin-textarea" value={categoryForm.description} onChange={(event) => setCategoryForm((current) => ({ ...current, description: event.target.value }))} /></div>
+                <fieldset className="admin-reference-assignment admin-reference-field-wide">
+                  <legend>Direct product types {categoryForm.allowProducts && <span>*</span>}</legend>
+                  <p>Only these types are available for products assigned directly to this category. Child categories keep their own assignments.</p>
+                  <div className="admin-reference-checklist">
+                    {productTypes.filter((type) => type.isActive && !type.deletedAt).map((type) => <label key={type.id}><input type="checkbox" checked={categoryProductTypeIds.includes(type.id)} onChange={(event) => setCategoryProductTypeIds((current) => event.target.checked ? [...current, type.id] : current.filter((id) => id !== type.id))} /> {type.name}</label>)}
+                  </div>
+                </fieldset>
               </div>
               <div className="admin-reference-options">
                 <label className="admin-checkbox"><input type="checkbox" checked={categoryForm.isActive} onChange={(event) => setCategoryForm((current) => ({ ...current, isActive: event.target.checked }))} /> Active category</label>
+                <label className="admin-checkbox"><input type="checkbox" checked={categoryForm.allowProducts} onChange={(event) => { const allowProducts = event.target.checked; setCategoryForm((current) => ({ ...current, allowProducts })); if (!allowProducts) setCategoryProductTypeIds([]); }} /> Allow products directly in this category</label>
                 <label className="admin-checkbox"><input type="checkbox" checked={categoryForm.showOnHomepage} onChange={(event) => setCategoryForm((current) => ({ ...current, showOnHomepage: event.target.checked }))} /> Show on homepage</label>
               </div>
               <div className="admin-form-actions"><button type="button" className="btn btn-ghost" onClick={closeCategoryEditor}>Cancel</button><button className="btn btn-primary" disabled={busy}>{busy ? "Saving..." : "Save category"}</button></div>
@@ -466,7 +551,7 @@ export const AdminCatalogSettingsPage: React.FC<AdminCatalogSettingsPageProps> =
           )}
 
           {loading ? <div className="admin-empty-state">Loading categories...</div> : (
-            <div className="admin-table-wrap"><table className="admin-product-table admin-reference-table"><thead><tr><th>Category</th><th>Homepage</th><th>Order</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{categories.map((category) => <tr key={category.id} className={category.deletedAt ? "is-deleted" : ""}><td><strong>{category.name}</strong><span className="admin-product-brand">/{category.slug}{category.parentId ? ` · child of ${categories.find((item) => item.id === category.parentId)?.name ?? "category"}` : ""}</span></td><td>{category.showOnHomepage ? <span className="reference-visibility is-visible"><Eye size={15} /> Shown</span> : <span className="reference-visibility"><EyeOff size={15} /> Hidden</span>}</td><td>{category.sortOrder}</td><td><span className={`status-pill ${category.deletedAt || !category.isActive ? "status-inactive" : "status-active"}`}>{category.deletedAt ? "Deleted" : category.isActive ? "Active" : "Inactive"}</span></td><td><div className="admin-row-actions">{category.deletedAt ? <button type="button" className="admin-view-link" aria-label={`Restore ${category.name}`} title="Restore" disabled={busy} onClick={() => restoreCategory(category)}><RotateCcw size={17} /></button> : <><button type="button" className="admin-view-link" aria-label={`Edit ${category.name}`} title="Edit" onClick={() => editCategory(category)}><Pencil size={17} /></button><button type="button" className="admin-view-link reference-delete-button" aria-label={`Delete ${category.name}`} title="Delete" disabled={busy} onClick={() => removeCategory(category)}><Trash2 size={17} /></button></>}</div></td></tr>)}</tbody></table></div>
+            <div className="admin-table-wrap"><table className="admin-product-table admin-reference-table"><thead><tr><th>Category</th><th>Purpose</th><th>Homepage</th><th>Order</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{categories.map((category) => <tr key={category.id} className={category.deletedAt ? "is-deleted" : ""}><td><strong>{category.name}</strong><span className="admin-product-brand">/{category.slug}{category.parentId ? ` · child of ${categories.find((item) => item.id === category.parentId)?.name ?? "category"}` : ""}</span></td><td>{category.allowProducts ? "Product category" : "Grouping category"}</td><td>{category.showOnHomepage ? <span className="reference-visibility is-visible"><Eye size={15} /> Shown</span> : <span className="reference-visibility"><EyeOff size={15} /> Hidden</span>}</td><td>{category.sortOrder}</td><td><span className={`status-pill ${category.deletedAt || !category.isActive ? "status-inactive" : "status-active"}`}>{category.deletedAt ? "Deleted" : category.isActive ? "Active" : "Inactive"}</span></td><td><div className="admin-row-actions">{category.deletedAt ? <button type="button" className="admin-view-link" aria-label={`Restore ${category.name}`} title="Restore" disabled={busy} onClick={() => restoreCategory(category)}><RotateCcw size={17} /></button> : <><button type="button" className="admin-view-link" aria-label={`Edit ${category.name}`} title="Edit" onClick={() => editCategory(category)}><Pencil size={17} /></button><button type="button" className="admin-view-link reference-delete-button" aria-label={`Delete ${category.name}`} title="Delete" disabled={busy} onClick={() => removeCategory(category)}><Trash2 size={17} /></button></>}</div></td></tr>)}</tbody></table></div>
           )}
         </section>}
 
@@ -508,6 +593,12 @@ export const AdminCatalogSettingsPage: React.FC<AdminCatalogSettingsPageProps> =
                 <div className="form-group"><label htmlFor="type-name">Name</label><input id="type-name" className="form-input" value={productTypeForm.name} onChange={(event) => setProductTypeForm((current) => ({ ...current, name: event.target.value }))} minLength={2} maxLength={100} required /></div>
                 <div className="form-group"><label htmlFor="type-slug">Slug <small>(optional)</small></label><input id="type-slug" className="form-input" value={productTypeForm.slug} onChange={(event) => setProductTypeForm((current) => ({ ...current, slug: event.target.value.toLowerCase() }))} maxLength={120} placeholder="created-from-name" /></div>
                 <div className="form-group admin-reference-field-wide"><label htmlFor="type-description">Description</label><textarea id="type-description" className="form-input admin-textarea" value={productTypeForm.description} onChange={(event) => setProductTypeForm((current) => ({ ...current, description: event.target.value }))} /></div>
+                <ProductTypeAttributeEditor
+                  attributes={attributes}
+                  selections={productTypeAttributes}
+                  disabled={busy}
+                  onChange={setProductTypeAttributes}
+                />
               </div>
               <div className="admin-reference-options"><label className="admin-checkbox"><input type="checkbox" checked={productTypeForm.isActive} onChange={(event) => setProductTypeForm((current) => ({ ...current, isActive: event.target.checked }))} /> Active product type</label></div>
               <div className="admin-form-actions"><button type="button" className="btn btn-ghost" onClick={closeProductTypeEditor}>Cancel</button><button className="btn btn-primary" disabled={busy}>{busy ? "Saving..." : "Save product type"}</button></div>

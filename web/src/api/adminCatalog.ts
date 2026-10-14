@@ -8,6 +8,7 @@ export interface AdminCategory {
   description: string | null;
   imageUrl: string | null;
   isActive: boolean;
+  allowProducts: boolean;
   showOnHomepage: boolean;
   sortOrder: number;
   createdAt: string;
@@ -38,6 +39,11 @@ export interface AdminProductType {
   deletedAt: string | null;
 }
 
+export interface CategoryProductTypeAssignment {
+  categoryId: string;
+  productTypeIds: string[];
+}
+
 export interface AdminAttributeValue {
   id: string;
   attributeId: string;
@@ -61,6 +67,8 @@ export interface AdminAttribute {
 
 export interface ProductTypeAttributeAssignment {
   attributeId: string;
+  /** Present for product-specific configurations; null means an independent/root level. */
+  parentAttributeId?: string | null;
   isRequired: boolean;
   sortOrder: number;
   attribute: AdminAttribute;
@@ -73,6 +81,7 @@ export interface SaveCategoryInput {
   imageUrl: string | null;
   parentId: string | null;
   isActive: boolean;
+  allowProducts: boolean;
   showOnHomepage: boolean;
   sortOrder: number;
 }
@@ -118,6 +127,17 @@ export const adminCatalogApi = {
     apiClient<{ category: AdminCategory }>(`/admin/categories/${id}/restore`, {
       method: "POST",
     }).then(({ category }) => category),
+
+  getCategoryProductTypes: (categoryId: string) =>
+    apiClient<CategoryProductTypeAssignment>(`/admin/categories/${categoryId}/product-types`, {
+      method: "GET",
+    }),
+
+  setCategoryProductTypes: (categoryId: string, productTypeIds: string[]) =>
+    apiClient<CategoryProductTypeAssignment>(`/admin/categories/${categoryId}/product-types`, {
+      method: "PUT",
+      body: JSON.stringify({ productTypeIds }),
+    }),
 
   getBrands: (includeDeleted = true) =>
     apiClient<{ brands: AdminBrand[] }>(
@@ -177,7 +197,7 @@ export const adminCatalogApi = {
       { method: "GET" },
     ).then(({ attributes }) => attributes),
 
-  createAttribute: (input: { name: string; code?: string; inputType: AdminAttribute["inputType"]; isActive?: boolean }) =>
+  createAttribute: (input: { name: string; values: string[]; code?: string; inputType?: AdminAttribute["inputType"]; isActive?: boolean }) =>
     apiClient<{ attribute: AdminAttribute }>("/admin/attributes", {
       method: "POST",
       body: JSON.stringify(input),
@@ -221,4 +241,23 @@ export const adminCatalogApi = {
       method: "PUT",
       body: JSON.stringify({ attributes }),
     }).then(({ attributes: result }) => result),
+
+  getProductAttributes: (productId: string) =>
+    apiClient<{ attributes: ProductTypeAttributeAssignment[] }>(
+      `/admin/products/${productId}/attributes`,
+      { method: "GET" },
+    ).then(({ attributes }) => attributes),
+
+  setProductAttributes: (
+    productId: string,
+    attributes: Array<{
+      attributeId: string;
+      parentAttributeId: string | null;
+      isRequired: boolean;
+      sortOrder: number;
+    }>,
+  ) => apiClient<{ attributes: ProductTypeAttributeAssignment[] }>(
+    `/admin/products/${productId}/attributes`,
+    { method: "PUT", body: JSON.stringify({ attributes }) },
+  ).then(({ attributes: result }) => result),
 };

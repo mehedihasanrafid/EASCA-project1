@@ -29,6 +29,18 @@ export interface VariantAttributeSelection {
   };
 }
 
+interface AttributeSkuUsage {
+  count: number;
+  examples: string[];
+}
+
+/** Build the administrator-facing reason used when a SKU protects an attribute or value. */
+export function attributeSkuUsageMessage(kind: "attribute" | "value", name: string, usage: AttributeSkuUsage) {
+  const exampleText = usage.examples.length ? ` (${usage.examples.join(", ")}${usage.count > usage.examples.length ? ", …" : ""})` : "";
+  const subject = kind === "attribute" ? `the “${name}” attribute` : `the “${name}” value`;
+  return `Cannot delete ${subject} because ${usage.count} SKU${usage.count === 1 ? "" : "s"} use${usage.count === 1 ? "s" : ""} it${exampleText}. Reassign or delete the affected SKU variants first.`;
+}
+
 function slug(value: string) {
   const code = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 120).replace(/-+$/g, "");
   if (!code) throw new AppError(400, "ATTRIBUTE_CODE_REQUIRED", "Provide an English code when the name cannot form one.");
@@ -76,6 +88,31 @@ async function assertValueCodeAvailable(attributeId: string, code: string, ignor
   if (await query.getOne()) throw new AppError(409, "ATTRIBUTE_VALUE_CODE_EXISTS", "This attribute already has a value with that code.");
 }
 
+async function findAttributeSkuUsage(
+  manager: EntityManager,
+  filter: { attributeId: string } | { valueId: string },
+): Promise<AttributeSkuUsage> {
+  const baseQuery = manager
+    .getRepository(ProductVariantAttributeValue)
+    .createQueryBuilder("selection")
+    .withDeleted()
+    .innerJoin(ProductAttributeValue, "attributeValue", "attributeValue.id = selection.attributeValueId")
+    .innerJoin(ProductVariant, "variant", "variant.id = selection.productVariantId");
+
+  if ("valueId" in filter) {
+    baseQuery.where("selection.attributeValueId = :valueId", { valueId: filter.valueId });
+  } else {
+    baseQuery.where("attributeValue.attributeId = :attributeId", { attributeId: filter.attributeId });
+  }
+
+  const [{ count = "0" } = {}, examples] = await Promise.all([
+    baseQuery.clone().select("COUNT(DISTINCT selection.productVariantId)", "count").getRawOne<{ count: string }>(),
+    baseQuery.clone().select("DISTINCT variant.sku", "sku").orderBy("variant.sku", "ASC").limit(3).getRawMany<{ sku: string }>(),
+  ]);
+
+  return { count: Number(count), examples: examples.map(({ sku }) => sku) };
+}
+
 export async function listProductAttributes(includeDeleted: boolean) {
   const [attributes, values] = await Promise.all([
     AppDataSource.getRepository(ProductAttribute).find({ withDeleted: includeDeleted, order: { name: "ASC" } }),
@@ -87,9 +124,36 @@ export async function listProductAttributes(includeDeleted: boolean) {
 export async function createProductAttribute(input: CreateProductAttributeInput) {
   const code = input.code ?? slug(input.name);
   await assertAttributeCodeAvailable(code);
-  const repository = AppDataSource.getRepository(ProductAttribute);
-  const attribute = await repository.save(repository.create({ name: input.name, code, inputType: input.inputType, isActive: input.isActive ?? true }));
-  return attributeResponse(attribute);
+  const preparedValues = (input.values ?? []).map((label, sortOrder) => ({ label, code: slug(label), sortOrder }));
+  const valueCodes = new Set<string>();
+  for (const value of preparedValues) {
+    if (valueCodes.has(value.code)) {
+      throw new AppError(409, "ATTRIBUTE_VALUE_CODE_EXISTS", "Two values produce the same attribute code.");
+    }
+    valueCodes.add(value.code);
+  }
+
+  return AppDataSource.transaction(async (manager) => {
+    const attributeRepository = manager.getRepository(ProductAttribute);
+    const attribute = await attributeRepository.save(attributeRepository.create({
+      name: input.name,
+      code,
+      inputType: input.inputType,
+      isActive: input.isActive ?? true,
+    }));
+    const valueRepository = manager.getRepository(ProductAttributeValue);
+    const values = preparedValues.length
+      ? await valueRepository.save(preparedValues.map((value) => valueRepository.create({
+        attributeId: attribute.id,
+        label: value.label,
+        code: value.code,
+        colorHex: null,
+        sortOrder: value.sortOrder,
+        isActive: true,
+      })))
+      : [];
+    return attributeResponse(attribute, values);
+  });
 }
 
 export async function updateProductAttribute(id: string, input: UpdateProductAttributeInput) {
@@ -110,6 +174,10 @@ export async function deleteProductAttribute(id: string) {
   const attribute = await repository.findOneBy({ id });
   if (!attribute) throw new AppError(404, "ATTRIBUTE_NOT_FOUND", "Product attribute not found.");
   await AppDataSource.transaction(async (manager) => {
+    const usage = await findAttributeSkuUsage(manager, { attributeId: id });
+    if (usage.count > 0) {
+      throw new AppError(409, "ATTRIBUTE_IN_USE", attributeSkuUsageMessage("attribute", attribute.name, usage));
+    }
     await manager.getRepository(ProductTypeAttribute).delete({ attributeId: id });
     await manager.getRepository(ProductAttribute).softRemove(attribute);
   });
@@ -152,7 +220,13 @@ export async function deleteProductAttributeValue(attributeId: string, valueId: 
   const repository = AppDataSource.getRepository(ProductAttributeValue);
   const value = await repository.findOneBy({ id: valueId, attributeId });
   if (!value) throw new AppError(404, "ATTRIBUTE_VALUE_NOT_FOUND", "Attribute value not found.");
-  await repository.softRemove(value);
+  await AppDataSource.transaction(async (manager) => {
+    const usage = await findAttributeSkuUsage(manager, { valueId });
+    if (usage.count > 0) {
+      throw new AppError(409, "ATTRIBUTE_VALUE_IN_USE", attributeSkuUsageMessage("value", value.label, usage));
+    }
+    await manager.getRepository(ProductAttributeValue).softRemove(value);
+  });
 }
 
 export async function restoreProductAttributeValue(attributeId: string, valueId: string) {
@@ -196,11 +270,25 @@ export async function setProductTypeAttributes(productTypeId: string, input: Set
 export async function loadVariantAttributeSelections(variantIds: string[], manager: EntityManager = AppDataSource.manager) {
   const result = new Map<string, VariantAttributeSelection[]>();
   if (!variantIds.length) return result;
-  const rows = await manager.getRepository(ProductVariantAttributeValue).find({
-    where: { productVariantId: In(variantIds) },
-    relations: { attributeValue: { attribute: true } },
-    withDeleted: true,
-  });
+  const rows = await manager
+    .getRepository(ProductVariantAttributeValue)
+    .createQueryBuilder("selection")
+    .innerJoinAndSelect("selection.attributeValue", "attributeValue")
+    .innerJoinAndSelect("attributeValue.attribute", "attribute")
+    .innerJoin("selection.productVariant", "variant")
+    .innerJoin("variant.product", "product")
+    .leftJoin(
+      ProductTypeAttribute,
+      "assignment",
+      "assignment.productTypeId = product.productTypeId AND assignment.attributeId = attribute.id",
+    )
+    .where("selection.productVariantId IN (:...variantIds)", { variantIds })
+    .withDeleted()
+    .orderBy("variant.id", "ASC")
+    .addOrderBy("assignment.sortOrder", "ASC")
+    .addOrderBy("attribute.id", "ASC")
+    .addOrderBy("attributeValue.sortOrder", "ASC")
+    .getMany();
   for (const row of rows) {
     const value = row.attributeValue;
     const group = result.get(row.productVariantId) ?? [];

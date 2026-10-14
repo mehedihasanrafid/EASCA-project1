@@ -4,14 +4,17 @@ import {
   adminCategoryListQuerySchema,
   categoryIdParamsSchema,
   createCategorySchema,
+  setCategoryProductTypesSchema,
   updateCategorySchema,
 } from "./category.schema.js";
 import {
   createCategory,
   deleteCategory,
+  getCategoryProductTypes,
   listAdminCategories,
   listPublicCategoryTree,
   restoreCategory,
+  setCategoryProductTypes,
   updateCategory,
 } from "./category.service.js";
 
@@ -72,3 +75,25 @@ export const restoreCategoryForAdmin: RequestHandler = async (
   response.status(200).json({ success: true, data: { category } });
 };
 
+export const listCategoryProductTypesForAdmin: RequestHandler = async (
+  request,
+  response,
+) => {
+  const { id } = categoryIdParamsSchema.parse(request.params);
+  response.status(200).json({
+    success: true,
+    data: await getCategoryProductTypes(id),
+  });
+};
+
+export const setCategoryProductTypesForAdmin: RequestHandler = async (
+  request,
+  response,
+) => {
+  const { id } = categoryIdParamsSchema.parse(request.params);
+  const input = setCategoryProductTypesSchema.parse(request.body);
+  response.status(200).json({
+    success: true,
+    data: await setCategoryProductTypes(id, input),
+  });
+};

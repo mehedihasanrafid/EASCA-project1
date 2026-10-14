@@ -42,6 +42,9 @@ export class Category {
   @Column({ name: "show_on_homepage", type: "boolean", default: false })
   showOnHomepage!: boolean;
 
+  @Column({ name: "allow_products", type: "boolean", default: true })
+  allowProducts!: boolean;
+
   @CreateDateColumn({ name: "created_at", type: "datetime" })
   createdAt!: Date;
 

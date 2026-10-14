@@ -1,10 +1,15 @@
+import { In } from "typeorm";
+
 import { AppDataSource } from "../../database/data-source.js";
 import { AppError } from "../../utils/app-error.js";
 import { ProductMedia } from "../products/product-media.entity.js";
 import { Product } from "../products/product.entity.js";
+import { ProductType } from "../product-types/product-type.entity.js";
+import { CategoryProductType } from "./category-product-type.entity.js";
 import { Category } from "./category.entity.js";
 import type {
   CreateCategoryInput,
+  SetCategoryProductTypesInput,
   UpdateCategoryInput,
 } from "./category.schema.js";
 
@@ -19,6 +24,7 @@ export interface CategoryTreeItem {
   productCount: number;
   sortOrder: number;
   showOnHomepage: boolean;
+  allowProducts: boolean;
   children: CategoryTreeItem[];
 }
 
@@ -126,6 +132,7 @@ function toAdminCategory(category: Category) {
     isActive: category.isActive,
     sortOrder: category.sortOrder,
     showOnHomepage: category.showOnHomepage,
+    allowProducts: category.allowProducts,
     createdAt: category.createdAt,
     updatedAt: category.updatedAt,
     deletedAt: category.deletedAt,
@@ -220,6 +227,7 @@ export async function listPublicCategoryTree() {
       productCount: productSummary?.productCount ?? 0,
       sortOrder: category.sortOrder,
       showOnHomepage: category.showOnHomepage,
+      allowProducts: category.allowProducts,
       children: [],
     });
   }
@@ -249,6 +257,79 @@ export async function listAdminCategories(includeDeleted: boolean) {
   return categories.map(toAdminCategory);
 }
 
+export async function getCategoryProductTypes(categoryId: string) {
+  const category = await categoryRepository().findOneBy({ id: categoryId });
+  if (!category) throw new AppError(404, "CATEGORY_NOT_FOUND", "Category not found.");
+
+  const assignments = await AppDataSource.getRepository(CategoryProductType).find({
+    where: { categoryId },
+    order: { sortOrder: "ASC", productTypeId: "ASC" },
+  });
+
+  return {
+    categoryId,
+    productTypeIds: assignments.map((assignment) => assignment.productTypeId),
+  };
+}
+
+export async function setCategoryProductTypes(
+  categoryId: string,
+  input: SetCategoryProductTypesInput,
+) {
+  const category = await categoryRepository().findOneBy({ id: categoryId });
+  if (!category) throw new AppError(404, "CATEGORY_NOT_FOUND", "Category not found.");
+  if (!category.allowProducts && input.productTypeIds.length > 0) {
+    throw new AppError(
+      409,
+      "CATEGORY_DOES_NOT_ALLOW_PRODUCTS",
+      "Grouping categories cannot have direct product type assignments.",
+    );
+  }
+
+  const productTypes = input.productTypeIds.length > 0
+    ? await AppDataSource.getRepository(ProductType).findBy({
+        id: In(input.productTypeIds),
+        isActive: true,
+      })
+    : [];
+  if (productTypes.length !== input.productTypeIds.length) {
+    throw new AppError(
+      400,
+      "CATEGORY_PRODUCT_TYPE_INVALID",
+      "One or more product types do not exist, are inactive, or are deleted.",
+    );
+  }
+
+  const productsUsingRemovedTypeQuery = AppDataSource.getRepository(Product)
+    .createQueryBuilder("product")
+    .withDeleted()
+    .where("product.categoryId = :categoryId", { categoryId });
+  if (input.productTypeIds.length > 0) {
+    productsUsingRemovedTypeQuery.andWhere(
+      "product.productTypeId NOT IN (:...productTypeIds)",
+      { productTypeIds: input.productTypeIds },
+    );
+  }
+  const productsUsingRemovedType = await productsUsingRemovedTypeQuery.getCount();
+  if (productsUsingRemovedType > 0) {
+    throw new AppError(
+      409,
+      "CATEGORY_PRODUCT_TYPE_IN_USE",
+      "A removed product type is still used by a product in this category.",
+    );
+  }
+
+  await AppDataSource.transaction(async (manager) => {
+    const repository = manager.getRepository(CategoryProductType);
+    await repository.delete({ categoryId });
+    await repository.save(input.productTypeIds.map((productTypeId, index) =>
+      repository.create({ categoryId, productTypeId, sortOrder: index }),
+    ));
+  });
+
+  return getCategoryProductTypes(categoryId);
+}
+
 export async function createCategory(input: CreateCategoryInput) {
   const slug = input.slug ?? createSlug(input.name);
   await assertSlugAvailable(slug);
@@ -267,6 +348,7 @@ export async function createCategory(input: CreateCategoryInput) {
     isActive: input.isActive ?? true,
     sortOrder: input.sortOrder ?? 0,
     showOnHomepage: input.showOnHomepage ?? false,
+    allowProducts: input.allowProducts ?? true,
   });
 
   await repository.save(category);
@@ -301,13 +383,44 @@ export async function updateCategory(
   if (input.name !== undefined) category.name = input.name;
   if (input.description !== undefined) category.description = input.description;
   if (input.imageUrl !== undefined) category.imageUrl = input.imageUrl;
+  if (input.isActive === false || input.allowProducts === false) {
+    const productCount = await AppDataSource.getRepository(Product)
+      .createQueryBuilder("product")
+      .withDeleted()
+      .where("product.categoryId = :categoryId", { categoryId })
+      .getCount();
+    if (productCount > 0) {
+      throw new AppError(
+        409,
+        "CATEGORY_HAS_PRODUCTS",
+        "Move this category's products before disabling product assignment or making the category inactive.",
+      );
+    }
+  }
+  if (input.isActive === false) {
+    const activeChildCount = await repository.countBy({
+      parentId: category.id,
+      isActive: true,
+    });
+    if (activeChildCount > 0) {
+      throw new AppError(
+        409,
+        "CATEGORY_HAS_ACTIVE_CHILDREN",
+        "Move or deactivate this category's active child categories first.",
+      );
+    }
+  }
   if (input.isActive !== undefined) category.isActive = input.isActive;
+  if (input.allowProducts !== undefined) category.allowProducts = input.allowProducts;
   if (input.sortOrder !== undefined) category.sortOrder = input.sortOrder;
   if (input.showOnHomepage !== undefined) {
     category.showOnHomepage = input.showOnHomepage;
   }
 
   await repository.save(category);
+  if (input.allowProducts === false) {
+    await AppDataSource.getRepository(CategoryProductType).delete({ categoryId });
+  }
   return toAdminCategory(category);
 }
 
@@ -326,6 +439,29 @@ export async function deleteCategory(categoryId: string) {
       409,
       "CATEGORY_HAS_CHILDREN",
       "Move or delete this category's child categories first.",
+    );
+  }
+
+  const productCount = await AppDataSource.getRepository(Product)
+    .createQueryBuilder("product")
+    .withDeleted()
+    .where("product.categoryId = :categoryId", { categoryId })
+    .getCount();
+  if (productCount > 0) {
+    throw new AppError(
+      409,
+      "CATEGORY_HAS_PRODUCTS",
+      "Move this category's products before deleting it.",
+    );
+  }
+
+  const assignmentCount = await AppDataSource.getRepository(CategoryProductType)
+    .countBy({ categoryId });
+  if (assignmentCount > 0) {
+    throw new AppError(
+      409,
+      "CATEGORY_HAS_PRODUCT_TYPES",
+      "Remove this category's product type assignments before deleting it.",
     );
   }
 

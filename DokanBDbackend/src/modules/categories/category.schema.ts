@@ -12,6 +12,13 @@ export const categoryIdParamsSchema = z.object({
   id: entityIdSchema,
 });
 
+export const setCategoryProductTypesSchema = z.object({
+  productTypeIds: z.array(entityIdSchema).max(200),
+}).strict().refine(
+  ({ productTypeIds }) => new Set(productTypeIds).size === productTypeIds.length,
+  { message: "Choose each product type only once.", path: ["productTypeIds"] },
+);
+
 export const createCategorySchema = z
   .object({
     name: z.string().trim().min(2).max(100),
@@ -29,6 +36,7 @@ export const createCategorySchema = z
     imageUrl: nullableUrlSchema,
     parentId: z.union([entityIdSchema, z.null()]).optional(),
     isActive: z.boolean().optional(),
+    allowProducts: z.boolean().optional(),
     showOnHomepage: z.boolean().optional(),
     sortOrder: z.coerce.number().int().min(0).max(1_000_000).optional(),
   })
@@ -49,3 +57,4 @@ export const adminCategoryListQuerySchema = z.object({
 
 export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
 export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
+export type SetCategoryProductTypesInput = z.infer<typeof setCategoryProductTypesSchema>;

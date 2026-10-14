@@ -6,8 +6,10 @@ import {
   createCategoryForAdmin,
   deleteCategoryForAdmin,
   listCategoriesForAdmin,
+  listCategoryProductTypesForAdmin,
   listPublicCategories,
   restoreCategoryForAdmin,
+  setCategoryProductTypesForAdmin,
   updateCategoryForAdmin,
 } from "./category.controller.js";
 
@@ -22,3 +24,5 @@ adminCategoryRouter.post("/", createCategoryForAdmin);
 adminCategoryRouter.patch("/:id", updateCategoryForAdmin);
 adminCategoryRouter.delete("/:id", deleteCategoryForAdmin);
 adminCategoryRouter.post("/:id/restore", restoreCategoryForAdmin);
+adminCategoryRouter.get("/:id/product-types", listCategoryProductTypesForAdmin);
+adminCategoryRouter.put("/:id/product-types", setCategoryProductTypesForAdmin);

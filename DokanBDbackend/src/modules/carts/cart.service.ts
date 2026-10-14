@@ -5,7 +5,7 @@ import { AppError } from "../../utils/app-error.js";
 import { loadVariantAttributeSelections } from "../attributes/product-attribute.service.js";
 import { ProductMedia } from "../products/product-media.entity.js";
 import { ProductPriceTier } from "../products/product-price-tier.entity.js";
-import { effectiveVariantPrice } from "../products/product-pricing.js";
+import { effectiveVariantPricing } from "../products/product-pricing.js";
 import { ProductVariant } from "../products/product-variant.entity.js";
 import { User } from "../users/user.entity.js";
 import { CartItem } from "./cart-item.entity.js";
@@ -167,15 +167,22 @@ async function buildCartView(cartId: string, userId: string) {
   }
 
   let subtotal = 0n;
+  let regularSubtotal = 0n;
+  let savingsTotal = 0n;
   let totalQuantity = 0;
 
   const publicItems = items.map((item) => {
-    const unitPrice = toMinorUnits(effectiveVariantPrice(
+    const pricing = effectiveVariantPricing(
       item.productVariant,
       item.quantity,
       priceTiers,
-    ));
+    );
+    const regularUnitPrice = toMinorUnits(pricing.regularUnitPrice);
+    const baseUnitPrice = toMinorUnits(pricing.baseUnitPrice);
+    const unitPrice = toMinorUnits(pricing.unitPrice);
     const lineTotal = unitPrice * BigInt(item.quantity);
+    const regularLineTotal = regularUnitPrice * BigInt(item.quantity);
+    const itemSavings = regularLineTotal > lineTotal ? regularLineTotal - lineTotal : 0n;
     const product = item.productVariant.product;
     const primaryImage =
       primaryImageByVariant.get(item.productVariant.id) ??
@@ -189,13 +196,23 @@ async function buildCartView(cartId: string, userId: string) {
       item.quantity <= item.productVariant.stockQuantity;
 
     subtotal += lineTotal;
+    regularSubtotal += regularLineTotal;
+    savingsTotal += itemSavings;
     totalQuantity += item.quantity;
 
     return {
       id: item.id,
       quantity: item.quantity,
+      regularUnitPrice: formatMinorUnits(regularUnitPrice),
+      baseUnitPrice: formatMinorUnits(baseUnitPrice),
       unitPrice: formatMinorUnits(unitPrice),
       lineTotal: formatMinorUnits(lineTotal),
+      savingsTotal: formatMinorUnits(itemSavings),
+      pricing: {
+        source: pricing.source,
+        minimumQuantity: pricing.tier?.minimumQuantity ?? null,
+        isPromotion: pricing.tier?.isPromotion ?? false,
+      },
       available,
       productVariant: {
         id: item.productVariant.id,
@@ -231,7 +248,9 @@ async function buildCartView(cartId: string, userId: string) {
     totals: {
       itemCount: publicItems.length,
       totalQuantity,
+      regularSubtotal: formatMinorUnits(regularSubtotal),
       subtotal: formatMinorUnits(subtotal),
+      savingsTotal: formatMinorUnits(savingsTotal),
       currency: "BDT",
     },
     createdAt: cart.createdAt,

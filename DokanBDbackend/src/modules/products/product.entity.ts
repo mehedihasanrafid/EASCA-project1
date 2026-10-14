@@ -60,6 +60,12 @@ export class Product {
   @Column({ name: "discount_price", type: "decimal", precision: 12, scale: 2, nullable: true })
   discountPrice!: string | null;
 
+  @Column({ name: "discount_starts_at", type: "datetime", nullable: true })
+  discountStartsAt!: Date | null;
+
+  @Column({ name: "discount_ends_at", type: "datetime", nullable: true })
+  discountEndsAt!: Date | null;
+
   @Column({ type: "varchar", length: 30 })
   status!: string;
 

@@ -4,6 +4,7 @@ import { AppDataSource } from "../../database/data-source.js";
 import { AppError } from "../../utils/app-error.js";
 import { Brand } from "../brands/brand.entity.js";
 import { Category } from "../categories/category.entity.js";
+import { CategoryProductType } from "../categories/category-product-type.entity.js";
 import { InventoryMovement } from "../inventory/inventory-movement.entity.js";
 import { ProductType } from "../product-types/product-type.entity.js";
 import {
@@ -15,6 +16,8 @@ import {
 } from "../attributes/product-attribute.service.js";
 import { Vendor } from "../vendors/vendor.entity.js";
 import { ProductMedia } from "./product-media.entity.js";
+import { ProductPriceTier } from "./product-price-tier.entity.js";
+import { activeDiscountPrice, isDiscountActive } from "./product-pricing.js";
 import { ProductVariant } from "./product-variant.entity.js";
 import { Product } from "./product.entity.js";
 import type {
@@ -32,6 +35,7 @@ interface CatalogAssociations {
   variantsByProduct: Map<string, ProductVariant[]>;
   mediaByProduct: Map<string, ProductMedia[]>;
   attributeValuesByVariant: Map<string, VariantAttributeSelection[]>;
+  priceTiersByProduct: Map<string, ProductPriceTier[]>;
 }
 
 function productRepository() {
@@ -62,10 +66,20 @@ function money(value: number) {
   return value.toFixed(2);
 }
 
+function dateOrNull(value: string | null | undefined) {
+  return value === undefined ? undefined : value === null ? null : new Date(value);
+}
+
 function toPublicVariant(
   variant: ProductVariant,
   optionValues: VariantAttributeSelection[] = [],
+  priceTiers: ProductPriceTier[] = [],
 ) {
+  const discountIsActive = isDiscountActive(
+    variant.discountPrice,
+    variant.discountStartsAt,
+    variant.discountEndsAt,
+  );
   return {
     id: variant.id,
     sku: variant.sku,
@@ -73,23 +87,48 @@ function toPublicVariant(
     name: variant.variantName,
     color: variant.color,
     size: variant.size,
-    price: variant.price,
+    price: activeDiscountPrice(
+      variant.price,
+      variant.discountPrice,
+      variant.discountStartsAt,
+      variant.discountEndsAt,
+    ),
+    regularPrice: variant.price,
+    discountPrice: discountIsActive ? variant.discountPrice : null,
+    discountStartsAt: variant.discountStartsAt,
+    discountEndsAt: variant.discountEndsAt,
     stockQuantity: variant.stockQuantity,
     inStock: variant.stockQuantity > 0,
     weight: variant.weight,
+    lengthCm: variant.lengthCm,
+    widthCm: variant.widthCm,
+    heightCm: variant.heightCm,
     isDefault: variant.isDefault,
     optionValues,
+    priceTiers: priceTiers
+      .filter((tier) => tier.isActive && (tier.variantId === null || tier.variantId === variant.id))
+      .map((tier) => ({
+        id: tier.id,
+        variantId: tier.variantId,
+        minimumQuantity: tier.minimumQuantity,
+        unitPrice: tier.unitPrice,
+        isPromotion: tier.isPromotion,
+      })),
   };
 }
 
 function toAdminVariant(
   variant: ProductVariant,
   optionValues: VariantAttributeSelection[] = [],
+  priceTiers: ProductPriceTier[] = [],
 ) {
   return {
-    ...toPublicVariant(variant, optionValues),
+    ...toPublicVariant(variant, optionValues, priceTiers),
     vendorId: variant.vendorId,
     costPrice: variant.costPrice,
+    discountPrice: variant.discountPrice,
+    discountStartsAt: variant.discountStartsAt,
+    discountEndsAt: variant.discountEndsAt,
     lowStockLevel: variant.lowStockLevel,
     isActive: variant.isActive,
     createdAt: variant.createdAt,
@@ -121,6 +160,7 @@ function toPublicProduct(
   media: ProductMedia[],
   includeDetail: boolean,
   attributeValuesByVariant: Map<string, VariantAttributeSelection[]> = new Map(),
+  priceTiers: ProductPriceTier[] = [],
 ) {
   const stockQuantity = totalStock(variants);
   const primaryMedia =
@@ -146,15 +186,28 @@ function toPublicProduct(
     optionGroups.set(value.attribute.id, group);
   }
 
+  const discountIsActive = isDiscountActive(
+    product.discountPrice,
+    product.discountStartsAt,
+    product.discountEndsAt,
+  );
+
   return {
     id: product.id,
     name: product.name,
     slug: product.slug,
     shortDescription: product.shortDescription,
     ...(includeDetail ? { description: product.description } : {}),
-    price: product.discountPrice ?? product.defaultPrice,
+    price: activeDiscountPrice(
+      product.defaultPrice,
+      product.discountPrice,
+      product.discountStartsAt,
+      product.discountEndsAt,
+    ),
     regularPrice: product.defaultPrice,
-    discountPrice: product.discountPrice,
+    discountPrice: discountIsActive ? product.discountPrice : null,
+    discountStartsAt: product.discountStartsAt,
+    discountEndsAt: product.discountEndsAt,
     isFeatured: product.isFeatured,
     category: {
       id: product.category.id,
@@ -180,9 +233,21 @@ function toPublicProduct(
     ...(includeDetail
       ? {
           variants: variants.map((variant) =>
-            toPublicVariant(variant, attributeValuesByVariant.get(variant.id) ?? []),
+            toPublicVariant(
+              variant,
+              attributeValuesByVariant.get(variant.id) ?? [],
+              priceTiers,
+            ),
           ),
           options: [...optionGroups.values()],
+          priceTiers: priceTiers.map((tier) => ({
+            id: tier.id,
+            variantId: tier.variantId,
+            minimumQuantity: tier.minimumQuantity,
+            unitPrice: tier.unitPrice,
+            isPromotion: tier.isPromotion,
+            isActive: tier.isActive,
+          })),
         }
       : {}),
     createdAt: product.createdAt,
@@ -196,20 +261,28 @@ function toAdminProduct(
   media: ProductMedia[],
   includeDetail: boolean,
   attributeValuesByVariant: Map<string, VariantAttributeSelection[]> = new Map(),
+  priceTiers: ProductPriceTier[] = [],
 ) {
   return {
-    ...toPublicProduct(product, variants, media, includeDetail, attributeValuesByVariant),
+    ...toPublicProduct(product, variants, media, includeDetail, attributeValuesByVariant, priceTiers),
     productTypeId: product.productTypeId,
     categoryId: product.categoryId,
     brandId: product.brandId,
     defaultCostPrice: product.defaultCostPrice,
+    discountPrice: product.discountPrice,
+    discountStartsAt: product.discountStartsAt,
+    discountEndsAt: product.discountEndsAt,
     status: product.status,
     isActive: product.isActive,
     deletedAt: product.deletedAt,
     ...(includeDetail
       ? {
           variants: variants.map((variant) =>
-            toAdminVariant(variant, attributeValuesByVariant.get(variant.id) ?? []),
+            toAdminVariant(
+              variant,
+              attributeValuesByVariant.get(variant.id) ?? [],
+              priceTiers,
+            ),
           ),
         }
       : {}),
@@ -229,6 +302,41 @@ function applyCategoryFilter(
       categorySlug: category.toLowerCase(),
     });
   }
+}
+
+export function collectDescendantCategoryIds(
+  categories: Array<Pick<Category, "id" | "parentId">>,
+  targetId: string,
+) {
+  const ids = new Set<string>([targetId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const item of categories) {
+      if (item.parentId && ids.has(item.parentId) && !ids.has(item.id)) {
+        ids.add(item.id);
+        changed = true;
+      }
+    }
+  }
+  return [...ids];
+}
+
+async function resolvePublicCategoryIds(category: string | undefined) {
+  if (!category) return null;
+
+  const repository = AppDataSource.getRepository(Category);
+  const target = /^[1-9]\d*$/.test(category)
+    ? await repository.findOneBy({ id: category, isActive: true })
+    : await repository
+        .createQueryBuilder("category")
+        .where("LOWER(category.slug) = :slug", { slug: category.toLowerCase() })
+        .andWhere("category.isActive = :active", { active: true })
+        .getOne();
+  if (!target) return [];
+
+  const categories = await repository.find({ where: { isActive: true } });
+  return collectDescendantCategoryIds(categories, target.id);
 }
 
 function applyBrandFilter(
@@ -266,18 +374,6 @@ function applyStockFilter(
   );
 }
 
-function applySearchFilter(
-  query: SelectQueryBuilder<Product>,
-  search: string | undefined,
-) {
-  if (!search) return;
-
-  query.andWhere(
-    "(LOWER(product.name) LIKE :search OR LOWER(product.slug) LIKE :search)",
-    { search: `%${search.toLowerCase()}%` },
-  );
-}
-
 function applyPublicSearchFilter(
   query: SelectQueryBuilder<Product>,
   search: string | undefined,
@@ -295,6 +391,30 @@ function applyPublicSearchFilter(
         FROM product_variants search_variant
         WHERE search_variant.product_id = product.id
           AND search_variant.is_active = true
+          AND search_variant.deleted_at IS NULL
+          AND LOWER(search_variant.sku) LIKE :search
+      )
+    )`,
+    { search: `%${search.toLowerCase()}%` },
+  );
+}
+
+function applyAdminSearchFilter(
+  query: SelectQueryBuilder<Product>,
+  search: string | undefined,
+) {
+  if (!search) return;
+
+  query.andWhere(
+    `(
+      LOWER(product.name) LIKE :search
+      OR LOWER(product.slug) LIKE :search
+      OR LOWER(category.name) LIKE :search
+      OR LOWER(COALESCE(brand.name, '')) LIKE :search
+      OR EXISTS (
+        SELECT 1
+        FROM product_variants search_variant
+        WHERE search_variant.product_id = product.id
           AND search_variant.deleted_at IS NULL
           AND LOWER(search_variant.sku) LIKE :search
       )
@@ -330,10 +450,11 @@ async function loadAssociations(
 ): Promise<CatalogAssociations> {
   const variantsByProduct = new Map<string, ProductVariant[]>();
   const mediaByProduct = new Map<string, ProductMedia[]>();
+  const priceTiersByProduct = new Map<string, ProductPriceTier[]>();
   let attributeValuesByVariant = new Map<string, VariantAttributeSelection[]>();
 
   if (productIds.length === 0) {
-    return { variantsByProduct, mediaByProduct, attributeValuesByVariant };
+    return { variantsByProduct, mediaByProduct, attributeValuesByVariant, priceTiersByProduct };
   }
 
   const variantQuery = AppDataSource.getRepository(ProductVariant)
@@ -350,11 +471,15 @@ async function loadAssociations(
     variantQuery.withDeleted();
   }
 
-  const [variants, media] = await Promise.all([
+  const [variants, media, priceTiers] = await Promise.all([
     variantQuery.getMany(),
     AppDataSource.getRepository(ProductMedia).find({
       where: { productId: In(productIds) },
       order: { sortOrder: "ASC", id: "ASC" },
+    }),
+    AppDataSource.getRepository(ProductPriceTier).find({
+      where: { productId: In(productIds) },
+      order: { variantId: "ASC", minimumQuantity: "ASC", id: "ASC" },
     }),
   ]);
   attributeValuesByVariant = await loadVariantAttributeSelections(
@@ -373,7 +498,13 @@ async function loadAssociations(
     mediaByProduct.set(item.productId, group);
   }
 
-  return { variantsByProduct, mediaByProduct, attributeValuesByVariant };
+  for (const tier of priceTiers) {
+    const group = priceTiersByProduct.get(tier.productId) ?? [];
+    group.push(tier);
+    priceTiersByProduct.set(tier.productId, group);
+  }
+
+  return { variantsByProduct, mediaByProduct, attributeValuesByVariant, priceTiersByProduct };
 }
 
 async function assertSlugAvailable(slug: string, ignoredId?: string) {
@@ -408,6 +539,7 @@ async function assertProductRelations(
     AppDataSource.getRepository(Category).findOneBy({
       id: categoryId,
       isActive: true,
+      allowProducts: true,
     }),
     brandId
       ? AppDataSource.getRepository(Brand).findOneBy({
@@ -429,7 +561,7 @@ async function assertProductRelations(
     throw new AppError(
       400,
       "PRODUCT_CATEGORY_INVALID",
-      "The selected category does not exist or is inactive.",
+      "The selected category does not exist, is inactive, or is only used to group child categories.",
     );
   }
 
@@ -440,6 +572,19 @@ async function assertProductRelations(
       "The selected brand does not exist or is inactive.",
     );
   }
+
+  const categoryType = await AppDataSource.getRepository(CategoryProductType).findOneBy({
+    categoryId,
+    productTypeId,
+  });
+  if (!categoryType) {
+    throw new AppError(
+      400,
+      "PRODUCT_CATEGORY_TYPE_INVALID",
+      "The selected product type is not assigned to this category.",
+    );
+  }
+
 }
 
 async function assertVendor(vendorId: string | null | undefined) {
@@ -537,6 +682,12 @@ async function createVariantWithManager(
     color: input.color ?? selectedColor?.label ?? null,
     size: input.size ?? selectedSize?.label ?? null,
     price: money(input.price),
+    discountPrice:
+      input.discountPrice === undefined || input.discountPrice === null
+        ? null
+        : money(input.discountPrice),
+    discountStartsAt: dateOrNull(input.discountStartsAt) ?? null,
+    discountEndsAt: dateOrNull(input.discountEndsAt) ?? null,
     costPrice:
       input.costPrice === undefined || input.costPrice === null
         ? null
@@ -547,6 +698,18 @@ async function createVariantWithManager(
       input.weight === undefined || input.weight === null
         ? null
         : money(input.weight),
+    lengthCm:
+      input.lengthCm === undefined || input.lengthCm === null
+        ? null
+        : money(input.lengthCm),
+    widthCm:
+      input.widthCm === undefined || input.widthCm === null
+        ? null
+        : money(input.widthCm),
+    heightCm:
+      input.heightCm === undefined || input.heightCm === null
+        ? null
+        : money(input.heightCm),
     isDefault: shouldBeDefault,
     isActive: input.isActive ?? true,
   });
@@ -573,7 +736,12 @@ async function createVariantWithManager(
 }
 
 export async function listPublicProducts(input: PublicProductListQuery) {
-  const effectivePrice = "COALESCE(product.discountPrice, product.defaultPrice)";
+  const publicCategoryIds = await resolvePublicCategoryIds(input.category);
+  const effectivePrice = `CASE
+    WHEN product.discountPrice IS NOT NULL
+      AND (product.discountStartsAt IS NULL OR product.discountStartsAt <= CURRENT_TIMESTAMP)
+      AND (product.discountEndsAt IS NULL OR product.discountEndsAt >= CURRENT_TIMESTAMP)
+    THEN product.discountPrice ELSE product.defaultPrice END`;
   const query = productRepository()
     .createQueryBuilder("product")
     .innerJoin("product.category", "category")
@@ -583,7 +751,10 @@ export async function listPublicProducts(input: PublicProductListQuery) {
     .andWhere("category.isActive = :active", { active: true });
 
   applyPublicSearchFilter(query, input.search);
-  applyCategoryFilter(query, input.category);
+  if (publicCategoryIds) {
+    if (publicCategoryIds.length === 0) query.andWhere("1 = 0");
+    else query.andWhere("product.categoryId IN (:...publicCategoryIds)", { publicCategoryIds });
+  }
   applyBrandFilter(query, input.brand);
   applyStockFilter(query, input.inStock);
 
@@ -628,6 +799,7 @@ export async function listPublicProducts(input: PublicProductListQuery) {
         associations.mediaByProduct.get(product.id) ?? [],
         false,
         associations.attributeValuesByVariant,
+        associations.priceTiersByProduct.get(product.id) ?? [],
       ),
     ),
     pagination: {
@@ -683,6 +855,7 @@ export async function getProductSearchSuggestions(
       associations.mediaByProduct.get(product.id) ?? [],
       false,
       associations.attributeValuesByVariant,
+      associations.priceTiersByProduct.get(product.id) ?? [],
     );
 
     return {
@@ -739,17 +912,19 @@ export async function getPublicProduct(identifier: string) {
     associations.mediaByProduct.get(product.id) ?? [],
     true,
     associations.attributeValuesByVariant,
+    associations.priceTiersByProduct.get(product.id) ?? [],
   );
 }
 
 export async function listAdminProducts(input: AdminProductListQuery) {
   const query = productRepository()
     .createQueryBuilder("product")
-    .leftJoin("product.category", "category");
+    .leftJoin("product.category", "category")
+    .leftJoin("product.brand", "brand");
 
   if (input.includeDeleted) query.withDeleted();
   if (input.status) query.andWhere("product.status = :status", { status: input.status });
-  applySearchFilter(query, input.search);
+  applyAdminSearchFilter(query, input.search);
   applyCategoryFilter(query, input.category);
 
   const total = await query.getCount();
@@ -776,6 +951,7 @@ export async function listAdminProducts(input: AdminProductListQuery) {
         associations.mediaByProduct.get(product.id) ?? [],
         false,
         associations.attributeValuesByVariant,
+        associations.priceTiersByProduct.get(product.id) ?? [],
       ),
     ),
     pagination: {
@@ -797,7 +973,6 @@ export async function getAdminProduct(productId: string) {
 
   const associations = await loadAssociations([product.id], {
     publicOnly: false,
-    includeDeletedVariants: true,
   });
 
   return toAdminProduct(
@@ -806,6 +981,7 @@ export async function getAdminProduct(productId: string) {
     associations.mediaByProduct.get(product.id) ?? [],
     true,
     associations.attributeValuesByVariant,
+    associations.priceTiersByProduct.get(product.id) ?? [],
   );
 }
 
@@ -838,6 +1014,8 @@ export async function createProduct(input: CreateProductInput) {
       input.discountPrice === undefined || input.discountPrice === null
         ? null
         : money(input.discountPrice),
+    discountStartsAt: dateOrNull(input.discountStartsAt) ?? null,
+    discountEndsAt: dateOrNull(input.discountEndsAt) ?? null,
     status: input.status ?? "DRAFT",
     isFeatured: input.isFeatured ?? false,
     isActive: input.isActive ?? true,
@@ -901,6 +1079,23 @@ export async function updateProduct(
   if (input.discountPrice !== undefined) {
     product.discountPrice =
       input.discountPrice === null ? null : money(input.discountPrice);
+  }
+  if (input.discountStartsAt !== undefined) {
+    product.discountStartsAt = dateOrNull(input.discountStartsAt) ?? null;
+  }
+  if (input.discountEndsAt !== undefined) {
+    product.discountEndsAt = dateOrNull(input.discountEndsAt) ?? null;
+  }
+  if (
+    product.discountStartsAt &&
+    product.discountEndsAt &&
+    product.discountStartsAt.getTime() > product.discountEndsAt.getTime()
+  ) {
+    throw new AppError(
+      400,
+      "PRODUCT_DISCOUNT_SCHEDULE_INVALID",
+      "The discount end date must be after the start date.",
+    );
   }
   if (input.status !== undefined) product.status = input.status;
   if (input.isFeatured !== undefined) product.isFeatured = input.isFeatured;
@@ -1051,6 +1246,35 @@ export async function updateProductVariant(
       );
     }
 
+    const nextPrice = input.price ?? Number(variant.price);
+    const nextDiscountPrice = input.discountPrice === undefined
+      ? variant.discountPrice === null ? null : Number(variant.discountPrice)
+      : input.discountPrice;
+    const nextDiscountStartsAt = input.discountStartsAt === undefined
+      ? variant.discountStartsAt
+      : dateOrNull(input.discountStartsAt) ?? null;
+    const nextDiscountEndsAt = input.discountEndsAt === undefined
+      ? variant.discountEndsAt
+      : dateOrNull(input.discountEndsAt) ?? null;
+    if (nextDiscountPrice !== null && nextDiscountPrice > nextPrice) {
+      throw new AppError(
+        400,
+        "VARIANT_DISCOUNT_INVALID",
+        "discountPrice cannot be greater than price.",
+      );
+    }
+    if (
+      nextDiscountStartsAt &&
+      nextDiscountEndsAt &&
+      nextDiscountStartsAt.getTime() > nextDiscountEndsAt.getTime()
+    ) {
+      throw new AppError(
+        400,
+        "VARIANT_DISCOUNT_SCHEDULE_INVALID",
+        "The discount end date must be after the start date.",
+      );
+    }
+
     const quantityBefore = variant.stockQuantity;
     if (input.vendorId !== undefined) variant.vendorId = input.vendorId;
     if (input.sku !== undefined) variant.sku = input.sku;
@@ -1059,6 +1283,15 @@ export async function updateProductVariant(
     if (input.color !== undefined) variant.color = input.color;
     if (input.size !== undefined) variant.size = input.size;
     if (input.price !== undefined) variant.price = money(input.price);
+    if (input.discountPrice !== undefined) {
+      variant.discountPrice = input.discountPrice === null ? null : money(input.discountPrice);
+    }
+    if (input.discountStartsAt !== undefined) {
+      variant.discountStartsAt = nextDiscountStartsAt;
+    }
+    if (input.discountEndsAt !== undefined) {
+      variant.discountEndsAt = nextDiscountEndsAt;
+    }
     if (input.costPrice !== undefined) {
       variant.costPrice = input.costPrice === null ? null : money(input.costPrice);
     }
@@ -1070,6 +1303,15 @@ export async function updateProductVariant(
     }
     if (input.weight !== undefined) {
       variant.weight = input.weight === null ? null : money(input.weight);
+    }
+    if (input.lengthCm !== undefined) {
+      variant.lengthCm = input.lengthCm === null ? null : money(input.lengthCm);
+    }
+    if (input.widthCm !== undefined) {
+      variant.widthCm = input.widthCm === null ? null : money(input.widthCm);
+    }
+    if (input.heightCm !== undefined) {
+      variant.heightCm = input.heightCm === null ? null : money(input.heightCm);
     }
     if (input.isDefault !== undefined) variant.isDefault = input.isDefault;
     if (input.isActive !== undefined) variant.isActive = input.isActive;
@@ -1125,6 +1367,14 @@ export async function deleteProductVariant(
         404,
         "PRODUCT_VARIANT_NOT_FOUND",
         "Product variant not found.",
+      );
+    }
+
+    if (variant.stockQuantity > 0) {
+      throw new AppError(
+        409,
+        "PRODUCT_VARIANT_HAS_STOCK",
+        "Set this variant's stock to zero before removing it.",
       );
     }
 

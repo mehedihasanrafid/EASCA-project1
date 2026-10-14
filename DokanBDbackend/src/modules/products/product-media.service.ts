@@ -1,5 +1,6 @@
 import { unlink } from "node:fs/promises";
 import { basename, resolve } from "node:path";
+import { IsNull } from "typeorm";
 
 import { AppDataSource } from "../../database/data-source.js";
 import { env } from "../../config/env.js";
@@ -72,8 +73,12 @@ export async function addProductMedia(
   }
 
   const repository = AppDataSource.getRepository(ProductMedia);
+  const targetVariantId = input.variantId ?? null;
   const existing = await repository.find({
-    where: { productId },
+    where: {
+      productId,
+      variantId: targetVariantId === null ? IsNull() : targetVariantId,
+    },
     order: { sortOrder: "ASC" },
   });
 
@@ -81,7 +86,9 @@ export async function addProductMedia(
     throw new AppError(
       400,
       "PRODUCT_MEDIA_LIMIT",
-      "A product can have at most four media items.",
+      targetVariantId === null
+        ? "A product can have at most four shared media items."
+        : "A product variant can have at most four media items.",
     );
   }
 
@@ -95,7 +102,7 @@ export async function addProductMedia(
 
     return repository.create({
       productId,
-      variantId: input.variantId ?? null,
+      variantId: targetVariantId,
       mediaType,
       url: `/uploads/products/${file.filename}`,
       thumbnailUrl: null,
@@ -129,9 +136,7 @@ export async function updateProductImage(
       );
     }
 
-    if (input.isPrimary === true) {
-      await repository.update({ productId, isPrimary: true }, { isPrimary: false });
-    }
+    const targetVariantId = input.variantId === undefined ? media.variantId : input.variantId;
     if (input.variantId !== undefined && input.variantId !== null) {
       const variant = await manager.getRepository(ProductVariant).findOneBy({
         id: input.variantId,
@@ -140,6 +145,39 @@ export async function updateProductImage(
       if (!variant) {
         throw new AppError(400, "VARIANT_INVALID", "Variant does not belong to this product.");
       }
+    }
+    if (input.variantId !== undefined && targetVariantId !== media.variantId) {
+      const targetCount = await repository.countBy({
+        productId,
+        variantId: targetVariantId === null ? IsNull() : targetVariantId,
+      });
+      if (targetCount >= 4) {
+        throw new AppError(
+          400,
+          "PRODUCT_MEDIA_LIMIT",
+          targetVariantId === null
+            ? "A product can have at most four shared media items."
+            : "A product variant can have at most four media items.",
+        );
+      }
+      if (media.mediaType === "IMAGE" && input.isPrimary === undefined) {
+        const targetPrimary = await repository.findOneBy({
+          productId,
+          variantId: targetVariantId === null ? IsNull() : targetVariantId,
+          isPrimary: true,
+        });
+        media.isPrimary = !targetPrimary;
+      }
+    }
+    if (input.isPrimary === true) {
+      await repository.update(
+        {
+          productId,
+          variantId: targetVariantId === null ? IsNull() : targetVariantId,
+          isPrimary: true,
+        },
+        { isPrimary: false },
+      );
     }
     if (input.variantId !== undefined) media.variantId = input.variantId;
     if (input.altText !== undefined) media.altText = input.altText;

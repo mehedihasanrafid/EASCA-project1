@@ -13,6 +13,7 @@ import {
   listProductSearchSuggestions,
   listProductsForAdmin,
   restoreProductForAdmin,
+  replacePriceTiersForAdmin,
   showProduct,
   showProductForAdmin,
   updateProductForAdmin,
@@ -51,6 +52,7 @@ adminProductRouter.get("/:id", showProductForAdmin);
 adminProductRouter.patch("/:id", updateProductForAdmin);
 adminProductRouter.delete("/:id", deleteProductForAdmin);
 adminProductRouter.post("/:id/restore", restoreProductForAdmin);
+adminProductRouter.put("/:id/price-tiers", replacePriceTiersForAdmin);
 adminProductRouter.post("/:productId/variants", createVariantForAdmin);
 adminProductRouter.post("/:productId/variants/bulk", createVariantsBulkForAdmin);
 adminProductRouter.patch(

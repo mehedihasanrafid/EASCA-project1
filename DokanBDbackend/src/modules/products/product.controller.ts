@@ -12,9 +12,11 @@ import {
   productSearchSuggestionsQuerySchema,
   productVariantParamsSchema,
   publicProductListQuerySchema,
+  replaceProductPriceTiersSchema,
   updateProductSchema,
   updateProductVariantSchema,
 } from "./product.schema.js";
+import { replaceProductPriceTiers } from "./product-price-tier.service.js";
 import {
   createProduct,
   createProductVariant,
@@ -185,4 +187,15 @@ export const deleteVariantForAdmin: RequestHandler = async (
   await deleteProductVariant(productId, variantId);
 
   response.status(204).send();
+};
+
+export const replacePriceTiersForAdmin: RequestHandler = async (
+  request,
+  response,
+) => {
+  const { id } = productIdParamsSchema.parse(request.params);
+  const input = replaceProductPriceTiersSchema.parse(request.body);
+  const priceTiers = await replaceProductPriceTiers(id, input);
+
+  response.status(200).json({ success: true, data: { priceTiers } });
 };

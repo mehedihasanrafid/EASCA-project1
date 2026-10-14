@@ -49,6 +49,15 @@ export class ProductVariant {
   @Column({ type: "decimal", precision: 12, scale: 2 })
   price!: string;
 
+  @Column({ name: "discount_price", type: "decimal", precision: 12, scale: 2, nullable: true })
+  discountPrice!: string | null;
+
+  @Column({ name: "discount_starts_at", type: "datetime", nullable: true })
+  discountStartsAt!: Date | null;
+
+  @Column({ name: "discount_ends_at", type: "datetime", nullable: true })
+  discountEndsAt!: Date | null;
+
   @Column({ name: "cost_price", type: "decimal", precision: 12, scale: 2, nullable: true })
   costPrice!: string | null;
 
@@ -60,6 +69,15 @@ export class ProductVariant {
 
   @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
   weight!: string | null;
+
+  @Column({ name: "length_cm", type: "decimal", precision: 10, scale: 2, nullable: true })
+  lengthCm!: string | null;
+
+  @Column({ name: "width_cm", type: "decimal", precision: 10, scale: 2, nullable: true })
+  widthCm!: string | null;
+
+  @Column({ name: "height_cm", type: "decimal", precision: 10, scale: 2, nullable: true })
+  heightCm!: string | null;
 
   @Column({ name: "is_default", type: "boolean", default: false })
   isDefault!: boolean;

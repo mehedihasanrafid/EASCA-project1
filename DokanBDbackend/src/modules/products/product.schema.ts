@@ -6,6 +6,19 @@ const entityIdSchema = z
 
 const moneySchema = z.coerce.number().finite().min(0).max(999_999_999.99);
 const optionalMoneySchema = z.union([moneySchema, z.null()]).optional();
+const optionalDateTimeSchema = z.union([z.iso.datetime(), z.null()]).optional();
+const optionalDimensionSchema = z.union([
+  z.null(),
+  z.coerce.number().finite().min(0).max(99_999_999.99),
+]).optional();
+
+function hasValidDateRange(input: {
+  discountStartsAt?: string | null;
+  discountEndsAt?: string | null;
+}) {
+  return !input.discountStartsAt || !input.discountEndsAt ||
+    new Date(input.discountStartsAt).getTime() <= new Date(input.discountEndsAt).getTime();
+}
 
 export const productStatusSchema = z.enum([
   "DRAFT",
@@ -93,6 +106,8 @@ const productFields = {
   defaultPrice: moneySchema,
   defaultCostPrice: optionalMoneySchema,
   discountPrice: optionalMoneySchema,
+  discountStartsAt: optionalDateTimeSchema,
+  discountEndsAt: optionalDateTimeSchema,
   status: productStatusSchema.optional(),
   isFeatured: z.boolean().optional(),
   isActive: z.boolean().optional(),
@@ -110,7 +125,11 @@ export const createProductSchema = z
       message: "discountPrice cannot be greater than defaultPrice.",
       path: ["discountPrice"],
     },
-  );
+  )
+  .refine(hasValidDateRange, {
+    message: "discountEndsAt must be after discountStartsAt.",
+    path: ["discountEndsAt"],
+  });
 
 export const updateProductSchema = z
   .object({
@@ -124,6 +143,8 @@ export const updateProductSchema = z
     defaultPrice: productFields.defaultPrice.optional(),
     defaultCostPrice: productFields.defaultCostPrice,
     discountPrice: productFields.discountPrice,
+    discountStartsAt: productFields.discountStartsAt,
+    discountEndsAt: productFields.discountEndsAt,
     status: productFields.status,
     isFeatured: productFields.isFeatured,
     isActive: productFields.isActive,
@@ -131,6 +152,10 @@ export const updateProductSchema = z
   .strict()
   .refine((input) => Object.keys(input).length > 0, {
     message: "Provide at least one product field to update.",
+  })
+  .refine(hasValidDateRange, {
+    message: "discountEndsAt must be after discountStartsAt.",
+    path: ["discountEndsAt"],
   });
 
 const variantFields = {
@@ -143,16 +168,30 @@ const variantFields = {
   color: z.union([z.string().trim().min(1).max(100), z.null()]).optional(),
   size: z.union([z.string().trim().min(1).max(100), z.null()]).optional(),
   price: moneySchema,
+  discountPrice: optionalMoneySchema,
+  discountStartsAt: optionalDateTimeSchema,
+  discountEndsAt: optionalDateTimeSchema,
   costPrice: optionalMoneySchema,
   stockQuantity: z.coerce.number().int().min(0).max(2_147_483_647).optional(),
   lowStockLevel: z.coerce.number().int().min(0).max(2_147_483_647).optional(),
   weight: z.union([z.coerce.number().finite().min(0).max(99_999_999.99), z.null()]).optional(),
+  lengthCm: optionalDimensionSchema,
+  widthCm: optionalDimensionSchema,
+  heightCm: optionalDimensionSchema,
   isDefault: z.boolean().optional(),
   isActive: z.boolean().optional(),
   optionValueIds: z.array(entityIdSchema).max(20).optional(),
 };
 
-export const createProductVariantSchema = z.object(variantFields).strict();
+export const createProductVariantSchema = z.object(variantFields).strict()
+  .refine(
+    ({ price, discountPrice }) => discountPrice === undefined || discountPrice === null || discountPrice <= price,
+    { message: "discountPrice cannot be greater than price.", path: ["discountPrice"] },
+  )
+  .refine(hasValidDateRange, {
+    message: "discountEndsAt must be after discountStartsAt.",
+    path: ["discountEndsAt"],
+  });
 
 export const updateProductVariantSchema = z
   .object({
@@ -163,10 +202,16 @@ export const updateProductVariantSchema = z
     color: variantFields.color,
     size: variantFields.size,
     price: variantFields.price.optional(),
+    discountPrice: variantFields.discountPrice,
+    discountStartsAt: variantFields.discountStartsAt,
+    discountEndsAt: variantFields.discountEndsAt,
     costPrice: variantFields.costPrice,
     stockQuantity: variantFields.stockQuantity,
     lowStockLevel: variantFields.lowStockLevel,
     weight: variantFields.weight,
+    lengthCm: variantFields.lengthCm,
+    widthCm: variantFields.widthCm,
+    heightCm: variantFields.heightCm,
     isDefault: variantFields.isDefault,
     isActive: variantFields.isActive,
     optionValueIds: variantFields.optionValueIds,
@@ -174,6 +219,10 @@ export const updateProductVariantSchema = z
   .strict()
   .refine((input) => Object.keys(input).length > 0, {
     message: "Provide at least one variant field to update.",
+  })
+  .refine(hasValidDateRange, {
+    message: "discountEndsAt must be after discountStartsAt.",
+    path: ["discountEndsAt"],
   });
 
 export type PublicProductListQuery = z.infer<
@@ -201,3 +250,15 @@ export const createProductVariantsBulkSchema = z.object({
 export type CreateProductVariantsBulkInput = z.infer<
   typeof createProductVariantsBulkSchema
 >;
+
+export const replaceProductPriceTiersSchema = z.object({
+  tiers: z.array(z.object({
+    variantId: z.union([entityIdSchema, z.null()]).default(null),
+    minimumQuantity: z.coerce.number().int().min(2).max(1_000_000),
+    unitPrice: moneySchema,
+    isPromotion: z.boolean().default(false),
+    isActive: z.boolean().default(true),
+  }).strict()).max(100),
+}).strict();
+
+export type ReplaceProductPriceTiersInput = z.infer<typeof replaceProductPriceTiersSchema>;

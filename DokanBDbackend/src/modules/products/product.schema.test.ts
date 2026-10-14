@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createProductSchema,
+  createProductVariantSchema,
   createProductVariantsBulkSchema,
   productSearchSuggestionsQuerySchema,
   publicProductListQuerySchema,
+  replaceProductPriceTiersSchema,
+  updateProductVariantSchema,
 } from "./product.schema.js";
 
 describe("product search suggestion validation", () => {
@@ -74,5 +78,83 @@ describe("bulk product variant validation", () => {
 
   it("requires at least one variant", () => {
     expect(() => createProductVariantsBulkSchema.parse({ variants: [] })).toThrow();
+  });
+});
+
+describe("product variant dimension validation", () => {
+  it("accepts metric dimensions on create and normalizes numeric strings", () => {
+    const result = createProductVariantSchema.parse({
+      sku: "DIMENSION-1",
+      price: 900,
+      lengthCm: "30",
+      widthCm: "20.5",
+      heightCm: 3,
+    });
+
+    expect(result).toMatchObject({
+      lengthCm: 30,
+      widthCm: 20.5,
+      heightCm: 3,
+    });
+  });
+
+  it("allows a dimension to be cleared and rejects negative dimensions", () => {
+    expect(updateProductVariantSchema.parse({ lengthCm: null })).toEqual({
+      lengthCm: null,
+    });
+    expect(() => createProductVariantSchema.parse({
+      sku: "DIMENSION-INVALID",
+      price: 900,
+      heightCm: -1,
+    })).toThrow();
+  });
+});
+
+describe("product workbench pricing validation", () => {
+  const product = {
+    productTypeId: "1",
+    categoryId: "1",
+    name: "Scheduled product",
+    description: "Product description",
+    defaultPrice: 1000,
+    discountPrice: 800,
+  };
+
+  it("accepts scheduled product and individual variant offers", () => {
+    expect(createProductSchema.parse({
+      ...product,
+      discountStartsAt: "2026-10-12T04:00:00.000Z",
+      discountEndsAt: "2026-10-20T04:00:00.000Z",
+    }).discountPrice).toBe(800);
+    expect(createProductVariantSchema.parse({
+      sku: "SCHEDULED-1",
+      price: 900,
+      discountPrice: 750,
+      discountStartsAt: "2026-10-12T04:00:00.000Z",
+    }).discountPrice).toBe(750);
+  });
+
+  it("rejects inverted schedules and discounts above regular price", () => {
+    expect(() => createProductSchema.parse({
+      ...product,
+      discountStartsAt: "2026-10-20T04:00:00.000Z",
+      discountEndsAt: "2026-10-12T04:00:00.000Z",
+    })).toThrow();
+    expect(() => createProductVariantSchema.parse({
+      sku: "INVALID-1",
+      price: 900,
+      discountPrice: 950,
+    })).toThrow();
+  });
+
+  it("accepts all-variant and individual quantity price blocks", () => {
+    const result = replaceProductPriceTiersSchema.parse({
+      tiers: [
+        { variantId: null, minimumQuantity: 10, unitPrice: 480, isPromotion: true },
+        { variantId: "4", minimumQuantity: 20, unitPrice: 450 },
+      ],
+    });
+    expect(result.tiers).toHaveLength(2);
+    expect(result.tiers[0]?.isPromotion).toBe(true);
   });
 });

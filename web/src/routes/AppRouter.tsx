@@ -28,6 +28,9 @@ import { AdminProductTypesPage } from "../pages/admin/AdminProductTypesPage";
 import { AdminAttributesPage } from "../admin/attributes";
 import { AdminCouponsPage } from "../pages/admin/AdminCouponsPage";
 
+import { isStaffRole } from "../shared/utils/roles";
+
+
 const ProtectedRoute: React.FC = () => {
   const { user, loading } = useAuth();
 
@@ -42,9 +45,11 @@ const AccountRoute: React.FC = () => {
 
   if (loading) return <div className="loading-screen">Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role.code === "ADMIN" || user.role.code === "OWNER") {
-    return <Navigate to="/admin" replace />;
-  }
+ 
+if (isStaffRole(user.role.code)) {
+  return <Navigate to="/admin" replace />;
+}
+
 
   return <Outlet />;
 };
@@ -67,12 +72,14 @@ const PublicOnlyRoute: React.FC = () => {
 
   if (loading) return <div className="loading-screen">Loading...</div>;
   
-  if (user) {
-    if (user.role.code === "ADMIN" || user.role.code === "OWNER") {
-      return <Navigate to="/admin" replace />;
-    }
-    return <Navigate to="/account" replace />;
+  
+if (user) {
+  if (isStaffRole(user.role.code)) {
+    return <Navigate to="/admin" replace />;
   }
+  return <Navigate to="/account" replace />;
+}
+
 
   return <Outlet />;
 };

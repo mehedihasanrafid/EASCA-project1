@@ -2,6 +2,9 @@ import React, { useEffect, useRef, useState } from "react";
 import { LayoutDashboard, LogOut, ShoppingCart, UserRound } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
+
+import { isStaffRole } from "../../shared/utils/roles";
+
 import { useAuth } from "../auth/AuthContext";
 import { useCart } from "../cart/CartContext";
 import { ProductSearch } from "../catalog/components/ProductSearch";
@@ -22,7 +25,9 @@ export const StorefrontHeader: React.FC = () => {
   const [searchDraft, setSearchDraft] = useState(
     () => new URLSearchParams(location.search).get("q") ?? "",
   );
-  const isAdmin = user?.role.code === "ADMIN" || user?.role.code === "OWNER";
+  
+const isAdmin = isStaffRole(user?.role.code);
+
   const cartQuantity = cart?.totals.totalQuantity ?? 0;
 
   useEffect(() => {

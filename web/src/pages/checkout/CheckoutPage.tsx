@@ -3,7 +3,7 @@ import { ArrowLeft, BadgePercent, CheckCircle, MapPin, PackageCheck, ReceiptText
 import { Link } from "react-router-dom";
 
 import { Address, addressApi } from "../../api/addresses";
-import { ApiException } from "../../api/client";
+import { getApiErrorMessage } from "../../shared/utils/apiError";
 import { CheckoutPreview, Order, orderApi } from "../../api/orders";
 import { useCart } from "../../features/cart/CartContext";
 
@@ -13,13 +13,7 @@ const priceFormatter = new Intl.NumberFormat("en-BD", {
   minimumFractionDigits: 0,
 });
 
-function errorMessage(error: unknown) {
-  return error instanceof ApiException
-    ? error.error.message
-    : error instanceof Error
-      ? error.message
-      : "Checkout could not be completed.";
-}
+  
 
 function orderItemLabel(item: Order["items"][number]) {
   return item.variantName ? `${item.productName} · ${item.variantName}` : item.productName;
@@ -47,7 +41,7 @@ export const CheckoutPage: React.FC = () => {
         setAddresses(result);
         setSelectedAddressId(result.find((address) => address.isDefault)?.id ?? result[0]?.id ?? "");
       })
-      .catch((requestError) => setError(errorMessage(requestError)))
+      .catch((requestError) => setError(getApiErrorMessage(requestError, "Failed to load addresses")))
       .finally(() => setLoading(false));
   }, []);
 
@@ -70,8 +64,8 @@ export const CheckoutPage: React.FC = () => {
       .catch((requestError) => {
         if (active) {
           setPreview(null);
-          if (appliedCouponCode) setCouponError(errorMessage(requestError));
-          else setError(errorMessage(requestError));
+          if (appliedCouponCode) setCouponError(getApiErrorMessage(requestError, "Failed to apply coupon"));
+          else setError(getApiErrorMessage(requestError, "Failed to load checkout preview"));
         }
       })
       .finally(() => {
@@ -94,7 +88,7 @@ export const CheckoutPage: React.FC = () => {
       setPlacedOrder(order);
       await refreshCart();
     } catch (requestError) {
-      setError(errorMessage(requestError));
+      setError(getApiErrorMessage(requestError, "Failed to place order"));
     } finally {
       setSubmitting(false);
     }

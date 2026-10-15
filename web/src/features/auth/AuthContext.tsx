@@ -1,11 +1,18 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from "react";
-import { LoginInput, RegisterInput, User, authApi } from "../../api/auth";
+import {
+  DemoRole,
+  LoginInput,
+  RegisterInput,
+  User,
+  authApi,
+} from "../../api/auth";
 import { setAccessToken } from "../../api/client";
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (data: LoginInput) => Promise<void>;
+  loginAsDemo: (role: DemoRole) => Promise<void>;
   register: (data: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -50,6 +57,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(user);
   };
 
+  const loginAsDemo = async (role: DemoRole) => {
+    const { accessToken, user } = await authApi.demoLogin(role);
+    setAccessToken(accessToken);
+    setUser(user);
+  };
+
   const register = async (data: RegisterInput) => {
     await authApi.register(data);
     await login({ identifier: data.phone, password: data.password });
@@ -65,7 +78,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider
+      value={{ user, loading, login, loginAsDemo, register, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

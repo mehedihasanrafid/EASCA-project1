@@ -3,6 +3,7 @@ import type { CookieOptions, Request, RequestHandler } from "express";
 import { env } from "../../config/env.js";
 import { AppError } from "../../utils/app-error.js";
 import {
+  demoLoginSchema,
   forgotPasswordSchema,
   loginSchema,
   refreshTokenSchema,
@@ -14,6 +15,7 @@ import {
 import {
   forgotPassword as forgotPasswordService,
   getCurrentUser,
+  loginDemoUser,
   loginUser,
   registerUser,
   resendVerification as resendVerificationService,
@@ -23,6 +25,7 @@ import {
   rotateRefreshToken,
   verifyEmail as verifyEmailService,
 } from "./auth.service.js";
+import { demoRoles } from "./demo-auth.config.js";
 
 const REFRESH_COOKIE = "dokanbd_refresh_token";
 
@@ -57,6 +60,31 @@ export const register: RequestHandler = async (request, response) => {
 export const login: RequestHandler = async (request, response) => {
   const result = await loginUser(
     loginSchema.parse(request.body),
+    sessionMetadata(request),
+  );
+  const { refreshToken, ...publicResult } = result;
+
+  response.cookie(REFRESH_COOKIE, refreshToken, refreshCookieOptions());
+  response.status(200).json({ success: true, data: publicResult });
+};
+
+/**
+ * Public capability endpoint used by React to decide whether the demo panel is
+ * visible. This keeps DEMO_LOGIN_ENABLED as the only switch to change.
+ */
+export const demoLoginConfig: RequestHandler = (_request, response) => {
+  response.status(200).json({
+    success: true,
+    data: {
+      enabled: env.DEMO_LOGIN_ENABLED,
+      roles: env.DEMO_LOGIN_ENABLED ? demoRoles : [],
+    },
+  });
+};
+
+export const demoLogin: RequestHandler = async (request, response) => {
+  const result = await loginDemoUser(
+    demoLoginSchema.parse(request.body),
     sessionMetadata(request),
   );
   const { refreshToken, ...publicResult } = result;

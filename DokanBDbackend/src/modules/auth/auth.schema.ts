@@ -17,6 +17,12 @@ export const loginSchema = z.object({
   password: z.string().min(1).max(72),
 });
 
+// Only these two public demo destinations are supported. OWNER is intentionally
+// excluded so the most privileged role is never available through demo login.
+export const demoLoginSchema = z.object({
+  role: z.enum(["CUSTOMER", "ADMIN"]),
+});
+
 export const verifyEmailSchema = z.object({
   token: z.string().length(64),
 });
@@ -38,6 +44,7 @@ export const refreshTokenSchema = z.object({
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type DemoLoginInput = z.infer<typeof demoLoginSchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
 export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;

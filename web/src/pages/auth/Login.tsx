@@ -3,13 +3,16 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../features/auth/AuthContext";
 import { ApiException } from "../../api/client";
 import { AlertCircle } from "lucide-react";
+import type { DemoRole } from "../../api/auth";
+import { DemoLoginPanel } from "../../features/auth/demo-login";
 
 export const Login: React.FC = () => {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const [busyDemoRole, setBusyDemoRole] = useState<DemoRole | null>(null);
+  const { login, loginAsDemo } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -30,6 +33,26 @@ export const Login: React.FC = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDemoLogin = async (role: DemoRole) => {
+    setError("");
+    setBusyDemoRole(role);
+
+    try {
+      await loginAsDemo(role);
+      // Demo roles have explicit destinations, avoiding any ambiguity when the
+      // visitor arrived from a protected page for a different role.
+      navigate(role === "ADMIN" ? "/admin" : "/account", { replace: true });
+    } catch (err) {
+      if (err instanceof ApiException) {
+        setError(err.error.message);
+      } else {
+        setError("The demo could not be opened. Please try again.");
+      }
+    } finally {
+      setBusyDemoRole(null);
     }
   };
 
@@ -77,10 +100,16 @@ export const Login: React.FC = () => {
             />
           </div>
 
-          <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
+          <button
+            type="submit"
+            className="btn btn-primary btn-full"
+            disabled={loading || busyDemoRole !== null}
+          >
             {loading ? "Logging in..." : "Log In"}
           </button>
         </form>
+
+        <DemoLoginPanel busyRole={busyDemoRole} onSelect={handleDemoLogin} />
 
         <p className="auth-footer">
           Don't have an account? <Link to="/register" className="text-link">Sign up</Link>

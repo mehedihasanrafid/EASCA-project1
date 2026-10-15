@@ -36,3 +36,28 @@ describe("authApi email actions", () => {
     });
   });
 });
+
+describe("authApi demo login", () => {
+  beforeEach(() => apiClient.mockReset());
+
+  it("loads the server-controlled demo availability", async () => {
+    apiClient.mockResolvedValue({ enabled: true, roles: ["CUSTOMER", "ADMIN"] });
+
+    await authApi.getDemoLoginConfig();
+
+    expect(apiClient).toHaveBeenCalledWith("/auth/demo-login", {
+      method: "GET",
+    });
+  });
+
+  it("starts the selected demo role without sending credentials", async () => {
+    apiClient.mockResolvedValue({});
+
+    await authApi.demoLogin("ADMIN");
+
+    expect(apiClient).toHaveBeenCalledWith("/auth/demo-login", {
+      method: "POST",
+      body: JSON.stringify({ role: "ADMIN" }),
+    });
+  });
+});

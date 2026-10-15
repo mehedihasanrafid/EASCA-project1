@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
 import { In } from "typeorm";
 
 import { env } from "../../config/env.js";
@@ -9,6 +10,7 @@ import { Product } from "../../modules/products/product.entity.js";
 import { ProductVariant } from "../../modules/products/product-variant.entity.js";
 import { Role } from "../../modules/role/role.entity.js";
 import { User } from "../../modules/users/user.entity.js";
+import { demoAccounts } from "../../modules/auth/demo-auth.config.js";
 import { AppDataSource } from "../data-source.js";
 
 async function seed() {
@@ -21,6 +23,7 @@ async function seed() {
     const brandRepository = manager.getRepository(Brand);
     const productRepository = manager.getRepository(Product);
     const productVariantRepository = manager.getRepository(ProductVariant);
+    const userRepository = manager.getRepository(User);
 
     await roleRepository.upsert(
       [
@@ -353,6 +356,48 @@ async function seed() {
       ["sku"],
     );
 
+    if (env.DEMO_LOGIN_ENABLED) {
+      // Demo users cannot use the regular password form: their random password
+      // is not stored in configuration or sent to the frontend.
+      for (const account of Object.values(demoAccounts)) {
+        const role = await roleRepository.findOneByOrFail({ code: account.roleCode });
+        const existingUser = await userRepository.findOne({
+          where: [{ email: account.email }, { phone: account.phone }],
+          withDeleted: true,
+        });
+        const passwordHash = await bcrypt.hash(
+          randomBytes(32).toString("hex"),
+          12,
+        );
+
+        if (existingUser) {
+          existingUser.roleId = role.id;
+          existingUser.name = account.name;
+          existingUser.email = account.email;
+          existingUser.emailVerifiedAt = new Date();
+          existingUser.phone = account.phone;
+          existingUser.passwordHash = passwordHash;
+          existingUser.isActive = true;
+          existingUser.deletedAt = null;
+          await userRepository.save(existingUser);
+        } else {
+          await userRepository.save(
+            userRepository.create({
+              roleId: role.id,
+              name: account.name,
+              email: account.email,
+              emailVerifiedAt: new Date(),
+              phone: account.phone,
+              passwordHash,
+              profileImageUrl: null,
+              isActive: true,
+              lastLoginAt: null,
+            }),
+          );
+        }
+      }
+    }
+
     if (
       env.SEED_ADMIN_NAME &&
       env.SEED_ADMIN_EMAIL &&
@@ -360,7 +405,6 @@ async function seed() {
       env.SEED_ADMIN_PASSWORD
     ) {
       const adminRole = await roleRepository.findOneByOrFail({ code: "ADMIN" });
-      const userRepository = manager.getRepository(User);
       const existingAdmin = await userRepository.findOne({
         where: [
           { email: env.SEED_ADMIN_EMAIL },

@@ -4,6 +4,7 @@ import {
   discountPercentageFromPrice,
   discountPriceFromPercentage,
 } from "./discountDraft";
+} from "../utils/productEditor.validation";
 
 describe("discount draft calculations", () => {
   it("calculates a final price from percentage off", () => {

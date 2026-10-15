@@ -30,6 +30,11 @@ const environmentSchema = z.object({
   MAX_VIDEO_UPLOAD_BYTES: z.coerce.number().int().positive().default(20971520),
   DELIVERY_INSIDE_DHAKA: z.coerce.number().nonnegative().default(60),
   DELIVERY_OUTSIDE_DHAKA: z.coerce.number().nonnegative().default(120),
+  // One server-side switch controls both the demo-login API and its frontend UI.
+  DEMO_LOGIN_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
   SEED_ADMIN_NAME: z.string().min(2).optional(),
   SEED_ADMIN_EMAIL: z.string().email().optional(),
   SEED_ADMIN_PHONE: z.string().regex(/^01[3-9]\d{8}$/).optional(),

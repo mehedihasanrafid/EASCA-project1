@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ProductTypeAttributeAssignment } from "../../api/adminCatalog";
+import type { ProductTypeAttributeAssignment } from "../../../api/adminCatalog";
 import {
   SKIP_OPTION_VALUE,
   analyzeVariantPathRemoval,
@@ -8,7 +8,7 @@ import {
   changeVariantPathSelection,
   clearDeepestVariantPathChoice,
   selectedVariantPathIds,
-} from "./variantPaths";
+} from "../utils/variantPaths";
 
 const assignments = [
   {

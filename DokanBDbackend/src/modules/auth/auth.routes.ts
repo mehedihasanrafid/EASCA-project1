@@ -2,6 +2,8 @@ import { Router } from "express";
 import { rateLimit } from "express-rate-limit";
 
 import {
+  demoLogin,
+  demoLoginConfig,
   forgotPassword,
   login,
   logout,
@@ -33,6 +35,8 @@ const emailActionLimiter = rateLimit({
 
 authRouter.post("/register", authenticationLimiter, register);
 authRouter.post("/login", authenticationLimiter, login);
+authRouter.get("/demo-login", demoLoginConfig);
+authRouter.post("/demo-login", authenticationLimiter, demoLogin);
 authRouter.post("/refresh", authenticationLimiter, refresh);
 authRouter.post("/logout", logout);
 authRouter.post("/logout-all", requireAuth, logoutAll);

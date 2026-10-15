@@ -21,6 +21,7 @@ import {
 } from "./auth-token.service.js";
 import { RefreshSession } from "./refresh-session.entity.js";
 import type {
+  DemoLoginInput,
   ForgotPasswordInput,
   LoginInput,
   RegisterInput,
@@ -28,6 +29,7 @@ import type {
   ResetPasswordInput,
   VerifyEmailInput,
 } from "./auth.schema.js";
+import { demoAccounts } from "./demo-auth.config.js";
 
 const PASSWORD_ROUNDS = 12;
 
@@ -226,6 +228,50 @@ export async function loginUser(input: LoginInput, metadata: SessionMetadata) {
 
   if (!user.isActive) {
     throw new AppError(403, "ACCOUNT_DISABLED", "This account is disabled.");
+  }
+
+  user.lastLoginAt = new Date();
+  await userRepository.save(user);
+
+  return {
+    accessToken: createAccessToken(user.id, user.role.code),
+    refreshToken: await createRefreshSession(user.id, metadata),
+    tokenType: "Bearer",
+    expiresIn: env.JWT_EXPIRES_IN,
+    user: toPublicUser(user),
+  };
+}
+
+/**
+ * Starts a session for a seeded demo account without putting credentials in the
+ * browser bundle. The environment switch is checked again here so this service
+ * cannot be used accidentally when demo access is disabled.
+ */
+export async function loginDemoUser(
+  input: DemoLoginInput,
+  metadata: SessionMetadata,
+) {
+  if (!env.DEMO_LOGIN_ENABLED) {
+    throw new AppError(404, "DEMO_LOGIN_DISABLED", "Demo login is not available.");
+  }
+
+  const account = demoAccounts[input.role];
+  const userRepository = AppDataSource.getRepository(User);
+  const user = await userRepository.findOne({
+    where: { email: account.email },
+    relations: { role: true },
+  });
+
+  if (!user || user.role.code !== account.roleCode) {
+    throw new AppError(
+      503,
+      "DEMO_ACCOUNT_MISSING",
+      "The demo account is not ready. Run the database seed and try again.",
+    );
+  }
+
+  if (!user.isActive) {
+    throw new AppError(403, "ACCOUNT_DISABLED", "This demo account is disabled.");
   }
 
   user.lastLoginAt = new Date();

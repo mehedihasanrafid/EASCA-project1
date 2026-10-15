@@ -14,8 +14,8 @@ describe("OpenAPI documentation", () => {
       0,
     );
 
-    expect(Object.keys(paths)).toHaveLength(65);
-    expect(operationCount).toBe(90);
+    expect(Object.keys(paths)).toHaveLength(66);
+    expect(operationCount).toBe(92);
   });
 
   it("marks protected and administrator operations with bearer security", () => {

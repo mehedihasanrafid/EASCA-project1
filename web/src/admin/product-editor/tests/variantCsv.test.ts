@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { exportVariantsToCsv, parseVariantCsv } from "./variantCsv";
+import { exportVariantsToCsv, parseVariantCsv } from "../utils/variantCsv";
 
 describe("variant CSV interchange", () => {
   it("exports stable columns and escapes commas, quotes, and newlines", () => {

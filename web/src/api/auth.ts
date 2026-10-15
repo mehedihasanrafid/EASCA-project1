@@ -25,6 +25,13 @@ export interface LoginInput {
   password: string;
 }
 
+export type DemoRole = "CUSTOMER" | "ADMIN";
+
+export interface DemoLoginConfig {
+  enabled: boolean;
+  roles: DemoRole[];
+}
+
 export interface RegisterInput {
   name: string;
   phone: string;
@@ -37,6 +44,19 @@ export const authApi = {
     apiClient<AuthResult>("/auth/login", { 
       method: "POST", 
       body: JSON.stringify(data) 
+    }),
+
+  // The server owns the feature flag, so no second Vite setting can drift out
+  // of sync with the API's security decision.
+  getDemoLoginConfig: () =>
+    apiClient<DemoLoginConfig>("/auth/demo-login", {
+      method: "GET",
+    }),
+
+  demoLogin: (role: DemoRole) =>
+    apiClient<AuthResult>("/auth/demo-login", {
+      method: "POST",
+      body: JSON.stringify({ role }),
     }),
     
   register: (data: RegisterInput) =>

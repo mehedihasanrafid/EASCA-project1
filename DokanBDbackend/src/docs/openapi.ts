@@ -90,6 +90,27 @@ const endpointDefinitions: EndpointDefinition[] = [
     rateLimited: true,
   },
   {
+    method: "get",
+    path: "/auth/demo-login",
+    tag: "Authentication",
+    summary: "Check whether one-click demo login is available",
+    description:
+      "The response is controlled by the server-side DEMO_LOGIN_ENABLED setting.",
+    responseSchema: "DemoLoginConfigResponse",
+  },
+  {
+    method: "post",
+    path: "/auth/demo-login",
+    tag: "Authentication",
+    summary: "Start a Customer or Admin demo session",
+    description:
+      "Creates a JWT and refresh-token session for a dedicated seeded demo account. No demo password is exposed to the client.",
+    body: "DemoLoginRequest",
+    successDescription: "Demo login successful",
+    notFound: true,
+    rateLimited: true,
+  },
+  {
     method: "post",
     path: "/auth/refresh",
     tag: "Authentication",
@@ -1311,6 +1332,36 @@ export const openApiDocument = {
             description: "Registered email address or Bangladesh phone number",
           },
           password: { type: "string", format: "password", maxLength: 72 },
+        },
+      },
+      DemoLoginRequest: {
+        type: "object",
+        required: ["role"],
+        properties: {
+          role: {
+            type: "string",
+            enum: ["CUSTOMER", "ADMIN"],
+            description: "Demo area to open. OWNER access is never available.",
+          },
+        },
+      },
+      DemoLoginConfigResponse: {
+        type: "object",
+        required: ["success", "data"],
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            required: ["enabled", "roles"],
+            properties: {
+              enabled: { type: "boolean", example: true },
+              roles: {
+                type: "array",
+                items: { type: "string", enum: ["CUSTOMER", "ADMIN"] },
+                example: ["CUSTOMER", "ADMIN"],
+              },
+            },
+          },
         },
       },
       RefreshRequest: {

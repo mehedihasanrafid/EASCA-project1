@@ -2,13 +2,11 @@ import React from "react";
 import { ExternalLink, Package, Pencil } from "lucide-react";
 import { Link } from "react-router-dom";
 
+import { formatBdt } from "../../../shared/utils/currency";
+
 import { AdminProduct } from "../../../api/adminProducts";
 
-const priceFormatter = new Intl.NumberFormat("en-BD", {
-  style: "currency",
-  currency: "BDT",
-  minimumFractionDigits: 0,
-});
+
 
 interface Props {
   loading: boolean;
@@ -67,7 +65,9 @@ export const AdminProductsTable: React.FC<Props> = ({ loading, products, search 
                   </div>
                 </td>
                 <td>{product.category.name}</td>
-                <td>{priceFormatter.format(Number(product.price))}</td>
+                
+                <td>{formatBdt(product.price)}</td>
+
                 <td><span className={product.stockQuantity > 0 ? "stock-in" : "stock-out"}>{product.stockQuantity}</span></td>
                 <td><span className={`status-pill status-${product.status.toLowerCase()}`}>{product.status}</span></td>
                 <td>

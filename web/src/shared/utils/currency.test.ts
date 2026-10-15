@@ -10,6 +10,7 @@ describe("formatBdt", () => {
     expect(formatBdt("1500.50")).toBe(formatBdt(1500.5));
   });
 
+
   it("handles zero", () => {
     expect(formatBdt(0)).toContain("0");
   });

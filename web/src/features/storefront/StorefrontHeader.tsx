@@ -26,8 +26,8 @@ export const StorefrontHeader: React.FC = () => {
     () => new URLSearchParams(location.search).get("q") ?? "",
   );
   
-const isAdmin = isStaffRole(user?.role.code);
-
+   
+  const isAdmin = isStaffRole(user?.role.code);
   const cartQuantity = cart?.totals.totalQuantity ?? 0;
 
   useEffect(() => {

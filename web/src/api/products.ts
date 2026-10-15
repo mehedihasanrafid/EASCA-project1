@@ -2,6 +2,9 @@ import { apiClient } from "./client";
 
 import { buildQueryParams } from "../shared/utils/queryParams";
 
+import type { PaginationMeta } from "../shared/types/pagination";
+
+
 export type Money = string | number;
 
 export interface ProductMedia {
@@ -102,15 +105,12 @@ export interface Product {
   updatedAt: string;
 }
 
+
 export interface PaginatedProducts {
   products: Product[];
-  pagination: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
+  pagination: PaginationMeta;
 }
+
 
 export interface ProductSuggestion {
   id: string;

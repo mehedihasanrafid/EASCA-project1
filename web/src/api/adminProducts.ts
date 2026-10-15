@@ -1,6 +1,9 @@
 import { apiClient } from "./client";
 import type { Money, Product, ProductMedia, ProductPriceTier, ProductTaxonomy, ProductVariant } from "./products";
 
+import type { PaginationMeta } from "../shared/types/pagination";
+
+
 export interface AdminProduct extends Product {
   productTypeId: string;
   categoryId: string;
@@ -17,15 +20,12 @@ export interface CategoryOption extends ProductTaxonomy {
   children: CategoryOption[];
 }
 
+
 interface AdminProductList {
   products: AdminProduct[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+  pagination: PaginationMeta;
 }
+
 
 export interface CreateProductInput {
   productTypeId: string;

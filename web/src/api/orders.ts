@@ -2,6 +2,9 @@ import { apiClient } from "./client";
 
 import { buildQueryParams } from "../shared/utils/queryParams";
 
+import type { PaginationMeta } from "../shared/types/pagination";
+
+
 
 export type OrderStatus = "PENDING" | "CONFIRMED" | "SHIPPED" | "DELIVERED" | "CANCELLED";
 export type PaymentStatus = "PENDING" | "PAID" | "FAILED" | "REFUNDED";
@@ -91,12 +94,10 @@ export interface AdminOrder extends Order {
   adminNote: string | null;
 }
 
-export interface OrderPagination {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-}
+
+/** Keep the old type name available to existing order components. */
+export type OrderPagination = PaginationMeta;
+
 
 export interface CheckoutPreview {
   addressId: string;

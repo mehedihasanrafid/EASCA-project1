@@ -1,5 +1,8 @@
 import { apiClient } from "./client";
 
+import { buildQueryParams } from "../shared/utils/queryParams";
+
+
 export type OrderStatus = "PENDING" | "CONFIRMED" | "SHIPPED" | "DELIVERED" | "CANCELLED";
 export type PaymentStatus = "PENDING" | "PAID" | "FAILED" | "REFUNDED";
 
@@ -150,17 +153,17 @@ export const orderApi = {
       }),
     }).then(({ order }) => order),
 
-  list: (params: { page?: number; limit?: number; status?: OrderStatus } = {}) => {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined) query.set(key, String(value));
-    });
-    const suffix = query.toString();
-    return apiClient<{ orders: OrderSummary[]; pagination: OrderPagination }>(
-      `/orders${suffix ? `?${suffix}` : ""}`,
-      { method: "GET" },
-    );
-  },
+ 
+ list: (params: { page?: number; limit?: number; status?: OrderStatus } = {}) => {
+  // Build pagination and status filters using the shared utility.
+  const suffix = buildQueryParams(params);
+
+  return apiClient<{ orders: OrderSummary[]; pagination: OrderPagination }>(
+    `/orders${suffix ? `?${suffix}` : ""}`,
+    { method: "GET" },
+  );
+ },
+
 
   get: (orderId: string) =>
     apiClient<{ order: Order }>(`/orders/${encodeURIComponent(orderId)}`, {
@@ -175,25 +178,25 @@ export const orderApi = {
 };
 
 export const adminOrderApi = {
-  list: (
-    params: {
-      page?: number;
-      limit?: number;
-      status?: OrderStatus;
-      paymentStatus?: PaymentStatus;
-      search?: string;
-    } = {},
-  ) => {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== "") query.set(key, String(value));
-    });
-    const suffix = query.toString();
-    return apiClient<{ orders: AdminOrderSummary[]; pagination: OrderPagination }>(
-      `/admin/orders${suffix ? `?${suffix}` : ""}`,
-      { method: "GET" },
-    );
-  },
+
+list: (
+  params: {
+    page?: number;
+    limit?: number;
+    status?: OrderStatus;
+    paymentStatus?: PaymentStatus;
+    search?: string;
+  } = {},
+) => {
+  // Keep the existing order of query parameters and API behavior.
+  const suffix = buildQueryParams(params);
+
+  return apiClient<{ orders: AdminOrderSummary[]; pagination: OrderPagination }>(
+    `/admin/orders${suffix ? `?${suffix}` : ""}`,
+    { method: "GET" },
+  );
+},
+
 
   get: (orderId: string) =>
     apiClient<{ order: AdminOrder }>(`/admin/orders/${encodeURIComponent(orderId)}`, {

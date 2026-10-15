@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, BadgePercent, CheckCircle, ChevronLeft, ChevronRight, Play, ShoppingCart } from "lucide-react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
+
+import { isStaffRole } from "../../shared/utils/roles";
 import { ApiException } from "../../api/client";
 import { Product, productApi } from "../../api/products";
 import { useAuth } from "../../features/auth/AuthContext";
@@ -30,7 +32,7 @@ export const ProductDetail: React.FC = () => {
   const { slug = "" } = useParams();
   const { user } = useAuth();
   const { addItem } = useCart();
-  const isAdmin = user?.role.code === "ADMIN" || user?.role.code === "OWNER";
+  const isAdmin = isStaffRole(user?.role.code);
   const navigate = useNavigate();
   const location = useLocation();
   const [product, setProduct] = useState<Product | null>(null);
@@ -42,6 +44,9 @@ export const ProductDetail: React.FC = () => {
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+
+
+
 
   useEffect(() => {
     let active = true;

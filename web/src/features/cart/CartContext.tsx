@@ -4,6 +4,9 @@ import { Cart, cartApi } from "../../api/cart";
 import { ApiException } from "../../api/client";
 import { useAuth } from "../auth/AuthContext";
 
+import { isStaffRole } from "../../shared/utils/roles";
+
+
 interface CartContextValue {
   cart: Cart | null;
   loading: boolean;

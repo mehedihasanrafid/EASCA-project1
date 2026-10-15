@@ -1,5 +1,7 @@
 import { apiClient } from "./client";
 
+import { buildQueryParams } from "../shared/utils/queryParams";
+
 export type Money = string | number;
 
 export interface ProductMedia {
@@ -141,20 +143,17 @@ export interface ProductListParams {
 }
 
 export const productApi = {
-  getProducts: (params: ProductListParams = {}, signal?: AbortSignal) => {
-    const query = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== "") {
-          query.append(key, String(value));
-        }
-      });
-    }
-    const queryString = query.toString();
-    const url = `/products${queryString ? `?${queryString}` : ""}`;
-    
-    return apiClient<PaginatedProducts>(url, { method: "GET", signal });
-  },
+ 
+getProducts: (params: ProductListParams = {}, signal?: AbortSignal) => {
+  const queryString = buildQueryParams(params);
+  const url = `/products${queryString ? `?${queryString}` : ""}`;
+
+  return apiClient<PaginatedProducts>(url, {
+    method: "GET",
+    signal,
+  });
+},
+
 
   getSearchSuggestions: (search: string, limit = 8, signal?: AbortSignal) => {
     const query = new URLSearchParams({ q: search.trim(), limit: String(limit) });

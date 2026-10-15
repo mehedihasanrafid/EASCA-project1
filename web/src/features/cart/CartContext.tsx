@@ -36,9 +36,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
-  const canUseCart = Boolean(
-    user && user.role.code !== "ADMIN" && user.role.code !== "OWNER",
-  );
+
+  
+const canUseCart = Boolean(user && !isStaffRole(user.role.code));
+
 
   useEffect(() => {
     if (authLoading) return;

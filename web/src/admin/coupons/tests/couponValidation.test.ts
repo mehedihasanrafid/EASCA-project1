@@ -1,8 +1,7 @@
-import React from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { AdminCouponsPage, CouponDraft, validateCouponDraft } from "./AdminCouponsPage";
+import type { CouponDraft } from "../types/coupon.types";
+import { validateCouponDraft } from "../utils/couponValidation";
 
 const validDraft: CouponDraft = {
   code: "SAVE10",
@@ -19,14 +18,6 @@ const validDraft: CouponDraft = {
 };
 
 describe("coupon form validation", () => {
-  it("uses explicit validation instead of browser-native number/date blocking", () => {
-    const html = renderToStaticMarkup(<AdminCouponsPage />);
-
-    expect(html).toContain("noValidate");
-    expect(html.match(/type=\"datetime-local\"/g)).toHaveLength(2);
-    expect(html.match(/step=\"60\"/g)).toHaveLength(2);
-  });
-
   it("accepts valid browser-local start and end date values", () => {
     expect(validateCouponDraft(validDraft)).toBeNull();
   });

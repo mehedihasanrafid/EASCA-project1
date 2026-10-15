@@ -1,18 +1,4 @@
-
-/** Editable coupon form values before conversion into an API payload. */
-export interface CouponDraft {
-  code: string;
-  name: string;
-  discountType: "PERCENTAGE" | "FIXED";
-  value: string;
-  minimumSubtotal: string;
-  maximumDiscount: string;
-  startsAt: string;
-  endsAt: string;
-  usageLimit: string;
-  perCustomerLimit: string;
-  isActive: boolean;
-}
+import type { CouponDraft } from "../types/coupon.types";
 
 const validNumber = (value: string) =>
   value.trim() !== "" && Number.isFinite(Number(value));

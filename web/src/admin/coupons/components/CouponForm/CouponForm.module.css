@@ -1,0 +1,24 @@
+.form {
+  min-width: 0;
+}
+
+.grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.active {
+  align-self: end;
+  min-height: 2.8rem;
+}
+
+@media (max-width: 1180px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -2,9 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { apiClient } = vi.hoisted(() => ({ apiClient: vi.fn() }));
 
-vi.mock("./client", () => ({ apiClient }));
+vi.mock("../../../api/client", () => ({ apiClient }));
 
-import { AdminCoupon, SaveCouponInput, adminCouponApi } from "./adminCoupons";
+import { adminCouponApi } from "../api/adminCouponApi";
+import type { AdminCoupon, SaveCouponInput } from "../types/coupon.types";
 
 const input: SaveCouponInput = {
   code: "SAVE10",
@@ -34,7 +35,7 @@ describe("adminCouponApi", () => {
   });
 
   it("creates, updates, archives and restores a coupon", async () => {
-    const coupon = { id: "coupon-1", ...input } as unknown as AdminCoupon;
+    const coupon = { id: "1", ...input } as unknown as AdminCoupon;
     apiClient.mockResolvedValue({ coupon });
 
     await expect(adminCouponApi.create(input)).resolves.toBe(coupon);
@@ -43,21 +44,21 @@ describe("adminCouponApi", () => {
       body: JSON.stringify(input),
     });
 
-    await adminCouponApi.update("coupon-1", { isActive: false });
-    expect(apiClient).toHaveBeenLastCalledWith("/admin/coupons/coupon-1", {
+    await adminCouponApi.update("1", { isActive: false });
+    expect(apiClient).toHaveBeenLastCalledWith("/admin/coupons/1", {
       method: "PATCH",
       body: JSON.stringify({ isActive: false }),
     });
 
     apiClient.mockResolvedValue(undefined);
-    await adminCouponApi.remove("coupon-1");
-    expect(apiClient).toHaveBeenLastCalledWith("/admin/coupons/coupon-1", {
+    await adminCouponApi.remove("1");
+    expect(apiClient).toHaveBeenLastCalledWith("/admin/coupons/1", {
       method: "DELETE",
     });
 
     apiClient.mockResolvedValue({ coupon });
-    await expect(adminCouponApi.restore("coupon-1")).resolves.toBe(coupon);
-    expect(apiClient).toHaveBeenLastCalledWith("/admin/coupons/coupon-1/restore", {
+    await expect(adminCouponApi.restore("1")).resolves.toBe(coupon);
+    expect(apiClient).toHaveBeenLastCalledWith("/admin/coupons/1/restore", {
       method: "POST",
     });
   });

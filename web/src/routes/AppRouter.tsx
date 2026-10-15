@@ -26,7 +26,7 @@ import { AdminProductEditorPage } from "../admin/product-editor";
 import { AdminProductsPage } from "../admin/products";
 import { AdminProductTypesPage } from "../pages/admin/AdminProductTypesPage";
 import { AdminAttributesPage } from "../admin/attributes";
-import { AdminCouponsPage } from "../pages/admin/AdminCouponsPage";
+import { AdminCouponsPage } from "../admin/coupons";
 
 import { isStaffRole } from "../shared/utils/roles";
 

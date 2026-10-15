@@ -146,27 +146,6 @@
   min-width: 0;
 }
 
-.admin-coupons-page { max-width: 1380px; }
-.coupon-form-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.coupon-active { align-self: end; min-height: 2.8rem; }
-.coupon-table { min-width: 1080px; }
-.coupon-table td > strong,
-.coupon-table td > span,
-.coupon-table td > small { display: block; }
-.coupon-table td > small { margin-top: 0.2rem; color: var(--text-muted); font-size: 0.7rem; }
-.coupon-table tr.is-deleted { opacity: 0.65; }
-.admin-row-actions { display: flex; gap: 0.35rem; }
-.admin-row-actions button { display: grid; place-items: center; padding: 0.4rem; border: 0; border-radius: 0.4rem; color: var(--primary); background: var(--success-bg); cursor: pointer; }
-.admin-row-actions button.is-danger { color: var(--error); background: var(--error-bg); }
-
-@media (max-width: 1180px) {
-  .coupon-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-@media (max-width: 640px) {
-  .coupon-form-grid { grid-template-columns: 1fr; }
-}
-
 .admin-field-wide {
   grid-column: 1 / -1;
   min-width: 0;
